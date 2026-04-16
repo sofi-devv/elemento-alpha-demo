@@ -1,63 +1,287 @@
-import Image from "next/image";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  UserCheck,
+  ShieldCheck,
+  FileText,
+  Briefcase,
+  BarChart3,
+  PieChart,
+  Headphones,
+  MessageSquare,
+  FileBarChart,
+  ChevronRight,
+  CheckCircle2,
+  Clock,
+  Lock,
+} from "lucide-react";
+
+interface TimelineItem {
+  icon: React.ElementType;
+  label: string;
+  description: string;
+  link: string;
+  href?: string;
+}
+
+const timelineSteps: {
+  phase: number;
+  title: string;
+  subtitle: string;
+  status: "active" | "pending" | "locked";
+  date: string;
+  description: string;
+  items: TimelineItem[];
+}[] = [
+  {
+    phase: 1,
+    title: "Onboarding",
+    subtitle: "KYC & Procedimiento SARLAFT",
+    status: "active" as const,
+    date: "Fase 1",
+    description:
+      "Proceso de vinculación del cliente incluyendo la verificación de identidad (KYC) y el cumplimiento del procedimiento SARLAFT para la prevención de lavado de activos.",
+    items: [
+      {
+        icon: UserCheck,
+        label: "Verificación de Identidad (KYC)",
+        description: "Validación de documentos y datos personales del cliente",
+        link: "Iniciar verificación",
+        href: "/onboarding/kyc",
+      },
+      {
+        icon: ShieldCheck,
+        label: "Procedimiento SARLAFT",
+        description:
+          "Análisis de riesgo y debida diligencia según normativa vigente",
+        link: "Ver procedimiento",
+        href: "/onboarding/sarlaft",
+      },
+    ],
+  },
+  {
+    phase: 2,
+    title: "Front Office",
+    subtitle: "Panel de Muestra de Portafolios",
+    status: "pending" as const,
+    date: "Fase 2",
+    description:
+      "Acceso al panel principal del front office donde el cliente puede visualizar portafolios de inversión, rendimientos y opciones disponibles.",
+    items: [
+      {
+        icon: Briefcase,
+        label: "Portafolios de Inversión",
+        description:
+          "Visualización y selección de portafolios según perfil de riesgo",
+        link: "Ver portafolios",
+      },
+    ],
+  },
+  {
+    phase: 3,
+    title: "Reporting & Customer Support",
+    subtitle: "Reportes y Soporte al Cliente",
+    status: "locked" as const,
+    date: "Fase 3",
+    description:
+      "Generación de reportes financieros detallados y acceso a soporte personalizado para el cliente.",
+    items: [
+      {
+        icon: FileBarChart,
+        label: "Reportes Personalizados",
+        description:
+          "Generación de estados de cuenta y reportes de rendimiento a la medida",
+        link: "Generar reportes",
+      },
+    ],
+  },
+];
+
+function StatusIcon({ status }: { status: "active" | "pending" | "locked" }) {
+  if (status === "active") {
+    return (
+      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#BBE795] shadow-[0_0_16px_rgba(187,231,149,0.4)]">
+        <CheckCircle2 className="w-5 h-5 text-[#1a1a1a]" />
+      </div>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#F0FEE6] border-2 border-[#BBE795]">
+        <Clock className="w-5 h-5 text-[#6abf1a]" />
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 border-2 border-gray-200">
+      <Lock className="w-5 h-5 text-gray-400" />
+    </div>
+  );
+}
+
+function StatusBadge({ status }: { status: "active" | "pending" | "locked" }) {
+  if (status === "active") {
+    return (
+      <Badge className="bg-[#BBE795] text-[#1a1a1a] border-none font-semibold">
+        En Progreso
+      </Badge>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <Badge variant="outline" className="border-[#BBE795] text-[#6abf1a] font-semibold">
+        Pendiente
+      </Badge>
+    );
+  }
+  return (
+    <Badge variant="outline" className="border-gray-300 text-gray-400 font-semibold">
+      Bloqueado
+    </Badge>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-[#FAFAFA]">
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-xl">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold text-[#1a1a1a] tracking-tight">
+              Elemento
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Proceso de vinculación del cliente
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="w-2 h-2 rounded-full bg-[#BBE795] animate-pulse" />
+              <span>1 de 3 fases completadas</span>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      {/* Progress Bar */}
+      <div className="max-w-5xl mx-auto px-6 pt-6">
+        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-[#BBE795] to-[#7dd83a] rounded-full transition-all duration-700 ease-out"
+            style={{ width: "33%" }}
+          />
+        </div>
+        <div className="flex justify-between mt-2 text-xs text-gray-400">
+          <span>Onboarding</span>
+          <span>Front Office</span>
+          <span>Reporting</span>
+        </div>
+      </div>
+
+      {/* Timeline */}
+      <main className="max-w-5xl mx-auto px-6 py-10">
+        <div className="relative">
+          {timelineSteps.map((step, index) => (
+            <div key={step.phase} className="relative flex gap-6">
+              {/* Timeline Line + Icon */}
+              <div className="flex flex-col items-center">
+                <StatusIcon status={step.status} />
+                {index < timelineSteps.length - 1 && (
+                  <div
+                    className={`w-0.5 flex-1 my-3 rounded-full ${
+                      step.status === "active"
+                        ? "bg-gradient-to-b from-[#BBE795] to-[#BBE795]/20"
+                        : "bg-gray-200"
+                    }`}
+                  />
+                )}
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 pb-12">
+                {/* Phase Header */}
+                <div className="flex items-center gap-3 mb-1">
+                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                    {step.date}
+                  </span>
+                  <StatusBadge status={step.status} />
+                </div>
+                <h2 className="text-xl font-semibold text-[#1a1a1a] tracking-tight">
+                  {step.title}
+                </h2>
+                <p className="text-sm text-gray-500 mt-0.5 mb-4">
+                  {step.subtitle}
+                </p>
+                <p className="text-sm text-gray-600 leading-relaxed mb-5 max-w-2xl">
+                  {step.description}
+                </p>
+
+                {/* Items */}
+                <div className="grid gap-3">
+                  {step.items.map((item) => {
+                    const Icon = item.icon;
+                    const cardClass = `group flex items-center gap-4 px-4 py-3 rounded-xl ring-1 ring-foreground/10 cursor-pointer transition-all duration-300 hover:shadow-md ${
+                      step.status === "locked"
+                        ? "opacity-50 pointer-events-none"
+                        : "hover:ring-[#BBE795]/40"
+                    } ${
+                      step.status === "active"
+                        ? "bg-white"
+                        : "bg-white/70"
+                    }`;
+                    const inner = (
+                      <>
+                        <div
+                          className={`flex items-center justify-center w-10 h-10 rounded-lg shrink-0 ${
+                            step.status === "active"
+                              ? "bg-[#F0FEE6]"
+                              : "bg-gray-50"
+                          }`}
+                        >
+                          <Icon
+                            className={`w-5 h-5 ${
+                              step.status === "active"
+                                ? "text-[#6abf1a]"
+                                : "text-gray-400"
+                            }`}
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-[#1a1a1a]">
+                            {item.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {item.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs font-medium text-[#6abf1a] opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0">
+                          <span>{item.link}</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </div>
+                      </>
+                    );
+                    return item.href ? (
+                      <Link key={item.label} href={item.href} className={cardClass}>
+                        {inner}
+                      </Link>
+                    ) : (
+                      <div key={item.label} className={cardClass}>
+                        {inner}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </main>
     </div>
