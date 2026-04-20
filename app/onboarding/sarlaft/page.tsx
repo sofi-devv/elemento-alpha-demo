@@ -19,6 +19,9 @@ import {
   ChevronRight,
   X,
   Loader2,
+  ShieldCheck,
+  ScanLine,
+  Database,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -197,6 +200,291 @@ function DocCard({
   );
 }
 
+// ── Reglas SARLAFT que se validan por documento ────────────────────────────
+const SARLAFT_RULES = [
+  { label: "Lista OFAC / Clinton", db: "US Treasury" },
+  { label: "Lista Consolidada ONU", db: "CSNU · ONU" },
+  { label: "PEPs — Personas Expuestas Políticamente", db: "Procuraduría" },
+  { label: "CICAD / OEA — Narcotráfico", db: "CICAD · OEA" },
+  { label: "Bases de datos DIAN", db: "DIAN" },
+  { label: "Listas Policía Nacional", db: "DIJIN" },
+  { label: "SAGRILAFT — Beneficiario Final", db: "SFC" },
+  { label: "Análisis de riesgo ML/FT", db: "Motor IA" },
+];
+
+function getRulesForDoc(docIdx: number) {
+  const start = (docIdx * 3) % SARLAFT_RULES.length;
+  return [0, 1, 2].map((i) => SARLAFT_RULES[(start + i) % SARLAFT_RULES.length]);
+}
+
+// ── Pantalla de verificación animada ─────────────────────────────────────────
+function VerificationScreen({ docs }: { docs: Document[] }) {
+  const [currentDocIdx, setCurrentDocIdx] = useState(0);
+  const [phase, setPhase] = useState<"scanning" | "checking" | "approved">("scanning");
+  const [rulesVisible, setRulesVisible] = useState(0);
+  const [approvedDocs, setApprovedDocs] = useState<number[]>([]);
+  const [allDone, setAllDone] = useState(false);
+  const [scanPos, setScanPos] = useState(0);
+
+  // Scan line animation
+  useEffect(() => {
+    if (phase !== "scanning") { setScanPos(0); return; }
+    const interval = setInterval(() => {
+      setScanPos((p) => (p >= 100 ? 0 : p + 2));
+    }, 18);
+    return () => clearInterval(interval);
+  }, [phase]);
+
+  // State machine
+  useEffect(() => {
+    if (allDone) return;
+    const rules = getRulesForDoc(currentDocIdx);
+
+    if (phase === "scanning") {
+      const t = setTimeout(() => setPhase("checking"), 1400);
+      return () => clearTimeout(t);
+    }
+    if (phase === "checking") {
+      if (rulesVisible < rules.length) {
+        const t = setTimeout(() => setRulesVisible((r) => r + 1), 650);
+        return () => clearTimeout(t);
+      }
+      const t = setTimeout(() => setPhase("approved"), 500);
+      return () => clearTimeout(t);
+    }
+    if (phase === "approved") {
+      const t = setTimeout(() => {
+        setApprovedDocs((prev) => [...prev, currentDocIdx]);
+        const next = currentDocIdx + 1;
+        if (next >= docs.length) {
+          setAllDone(true);
+        } else {
+          setCurrentDocIdx(next);
+          setPhase("scanning");
+          setRulesVisible(0);
+        }
+      }, 900);
+      return () => clearTimeout(t);
+    }
+  }, [phase, rulesVisible, currentDocIdx, docs.length, allDone]);
+
+  const currentDoc = docs[currentDocIdx];
+  const CurrentIcon = currentDoc?.icon ?? FileText;
+  const rules = getRulesForDoc(currentDocIdx);
+
+  if (allDone) {
+    return (
+      <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-10 text-center animate-in fade-in duration-700">
+        <div className="w-20 h-20 rounded-full bg-[#BBE795] flex items-center justify-center mx-auto mb-5 shadow-[0_0_40px_rgba(187,231,149,0.5)]">
+          <ShieldCheck className="w-10 h-10 text-[#1a1a1a]" />
+        </div>
+        <h2 className="text-2xl font-bold text-[#1a1a1a] mb-2">Validación SARLAFT completada</h2>
+        <p className="text-sm text-gray-500 max-w-md mx-auto leading-relaxed mb-2">
+          Los <strong>{docs.length} documentos</strong> fueron validados contra las listas restrictivas internacionales y la normativa colombiana de prevención de lavado de activos.
+        </p>
+        <p className="text-xs text-gray-400 max-w-md mx-auto leading-relaxed mb-8">
+          Esta validación emplea procesamiento NLP con revisión <em>Human-in-the-Loop</em> para garantizar cumplimiento regulatorio.
+        </p>
+        <div className="grid grid-cols-2 gap-2 mb-8 max-w-sm mx-auto">
+          {SARLAFT_RULES.slice(0, 6).map((r) => (
+            <div key={r.label} className="flex items-center gap-2 text-xs text-left bg-[#F0FEE6] rounded-lg px-3 py-2 ring-1 ring-[#BBE795]/30">
+              <CheckCircle2 className="w-3.5 h-3.5 text-[#6abf1a] shrink-0" />
+              <span className="text-gray-600 font-medium">{r.db}</span>
+            </div>
+          ))}
+        </div>
+        <Link href="/">
+          <Button className="bg-[#1a1a1a] text-white hover:bg-black shadow-lg font-semibold">
+            Volver al panel principal
+          </Button>
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Encabezado de progreso */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[11px] font-semibold text-[#6abf1a] uppercase tracking-widest mb-0.5">Verificación SARLAFT</p>
+          <h2 className="text-lg font-bold text-[#1a1a1a]">
+            Documento {currentDocIdx + 1} de {docs.length}
+          </h2>
+        </div>
+        <div className="flex items-center gap-2 text-xs font-semibold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-full ring-1 ring-blue-100">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          En proceso
+        </div>
+      </div>
+
+      {/* Animación principal: Documento ↔ SARLAFT */}
+      <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-6 overflow-hidden">
+        <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center min-h-[260px]">
+
+          {/* ── Panel izquierdo: Documento ── */}
+          <div className="flex flex-col items-center gap-3">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documentación</p>
+            <div className="relative w-full max-w-[180px] mx-auto">
+              {/* Documento visual */}
+              <div className={`relative rounded-xl overflow-hidden border-2 transition-all duration-500 ${
+                phase === "approved" ? "border-[#BBE795] shadow-[0_0_20px_rgba(187,231,149,0.4)]" : "border-gray-200"
+              } bg-white p-4 min-h-[180px]`}>
+                {/* Scan line */}
+                {phase === "scanning" && (
+                  <div
+                    className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#6abf1a] to-transparent opacity-80 transition-none z-10"
+                    style={{ top: `${scanPos}%` }}
+                  />
+                )}
+                {/* Document content mockup */}
+                <div className={`flex items-center justify-center w-10 h-10 rounded-xl mb-3 mx-auto transition-colors duration-500 ${
+                  phase === "approved" ? "bg-[#BBE795]" : "bg-gray-100"
+                }`}>
+                  <CurrentIcon className={`w-5 h-5 transition-colors duration-500 ${
+                    phase === "approved" ? "text-[#1a1a1a]" : "text-gray-400"
+                  }`} />
+                </div>
+                <div className="space-y-1.5">
+                  {[100, 75, 90, 60, 80].map((w, i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 rounded-full transition-colors duration-500 ${
+                        phase === "scanning" && scanPos > i * 20
+                          ? "bg-[#BBE795]/60"
+                          : phase === "approved"
+                          ? "bg-[#BBE795]/40"
+                          : "bg-gray-100"
+                      }`}
+                      style={{ width: `${w}%` }}
+                    />
+                  ))}
+                </div>
+                {/* Approved badge */}
+                {phase === "approved" && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#F0FEE6]/80 animate-in fade-in duration-300">
+                    <div className="flex flex-col items-center gap-1">
+                      <CheckCircle2 className="w-8 h-8 text-[#6abf1a]" />
+                      <span className="text-xs font-bold text-[#6abf1a]">Aprobado</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-[11px] text-center text-gray-500 mt-2 font-medium leading-snug">{currentDoc?.title}</p>
+            </div>
+          </div>
+
+          {/* ── Centro: flujo animado ── */}
+          <div className="flex flex-col items-center gap-1 px-1">
+            {["↔", "↔", "↔"].map((_, i) => (
+              <div
+                key={i}
+                className={`w-px h-5 rounded-full transition-all duration-300 ${
+                  phase === "checking" ? "bg-[#BBE795]" : "bg-gray-200"
+                }`}
+                style={{ animationDelay: `${i * 0.1}s` }}
+              />
+            ))}
+            <div className={`my-1 rounded-full p-1.5 transition-all duration-500 ${
+              phase === "checking" ? "bg-[#BBE795]/20 ring-1 ring-[#BBE795]/40" : "bg-gray-50"
+            }`}>
+              <Database className={`w-4 h-4 transition-colors duration-300 ${
+                phase === "checking" ? "text-[#6abf1a]" : "text-gray-300"
+              }`} />
+            </div>
+            {["↔", "↔", "↔"].map((_, i) => (
+              <div
+                key={i}
+                className={`w-px h-5 rounded-full transition-all duration-300 ${
+                  phase === "checking" ? "bg-[#BBE795]" : "bg-gray-200"
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* ── Panel derecho: Reglas SARLAFT ── */}
+          <div className="flex flex-col gap-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">SARLAFT</p>
+            {rules.map((rule, i) => {
+              const visible = i < rulesVisible || phase === "approved";
+              const approved = phase === "approved" || i < rulesVisible;
+              return (
+                <div
+                  key={rule.label}
+                  className={`transition-all duration-500 ${visible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"}`}
+                >
+                  <div className={`flex items-start gap-2 p-2.5 rounded-xl ring-1 transition-all duration-300 ${
+                    approved
+                      ? "bg-[#F0FEE6] ring-[#BBE795]/40"
+                      : visible
+                      ? "bg-blue-50 ring-blue-100"
+                      : "bg-gray-50 ring-gray-100"
+                  }`}>
+                    <div className={`mt-0.5 shrink-0 w-4 h-4 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      approved ? "bg-[#BBE795]" : "bg-blue-100"
+                    }`}>
+                      {approved
+                        ? <CheckCircle2 className="w-2.5 h-2.5 text-[#1a1a1a]" />
+                        : <Loader2 className="w-2.5 h-2.5 text-blue-500 animate-spin" />
+                      }
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold text-[#1a1a1a] leading-snug">{rule.label}</p>
+                      <p className="text-[10px] text-gray-400 font-medium">{rule.db}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            {/* Reglas pendientes (placeholders) */}
+            {phase === "scanning" && (
+              <div className="space-y-2 mt-1">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-12 rounded-xl bg-gray-50 ring-1 ring-gray-100 animate-pulse" />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Barra de estado inferior */}
+        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
+          <ScanLine className={`w-4 h-4 shrink-0 transition-colors duration-300 ${
+            phase === "scanning" ? "text-[#6abf1a] animate-pulse" : phase === "checking" ? "text-blue-400" : "text-[#6abf1a]"
+          }`} />
+          <p className="text-xs text-gray-500 font-medium">
+            {phase === "scanning" && "Escaneando documento y extrayendo metadatos..."}
+            {phase === "checking" && `Cruzando con bases de datos SARLAFT — ${rulesVisible}/${rules.length} verificaciones`}
+            {phase === "approved" && "✓ Documento validado exitosamente"}
+          </p>
+        </div>
+      </div>
+
+      {/* Documentos ya verificados */}
+      {approvedDocs.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Verificados</p>
+          <div className="grid gap-2">
+            {approvedDocs.map((idx) => {
+              const d = docs[idx];
+              const Icon = d.icon;
+              return (
+                <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-[#F0FEE6]/60 ring-1 ring-[#BBE795]/30 animate-in fade-in duration-500">
+                  <div className="w-7 h-7 rounded-lg bg-[#BBE795] flex items-center justify-center shrink-0">
+                    <Icon className="w-3.5 h-3.5 text-[#1a1a1a]" />
+                  </div>
+                  <p className="text-xs font-semibold text-[#1a1a1a] flex-1 min-w-0 truncate">{d.title}</p>
+                  <CheckCircle2 className="w-4 h-4 text-[#6abf1a] shrink-0" />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SarlaftPage() {
   const [docs, setDocs] = useState<Document[]>(initialDocs);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -207,7 +495,7 @@ export default function SarlaftPage() {
     if (isVerifying && verifiedIndex < docs.length) {
       const timer = setTimeout(() => {
         setVerifiedIndex((prev) => prev + 1);
-      }, 700); // Verify one doc every 700ms
+      }, 700);
       return () => clearTimeout(timer);
     }
   }, [isVerifying, verifiedIndex, docs.length]);
@@ -348,84 +636,7 @@ export default function SarlaftPage() {
             </div>
           </>
         ) : (
-          <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-8 shadow-sm">
-            <h2 className="text-2xl font-bold text-[#1a1a1a] tracking-tight mb-8 flex items-center gap-3">
-              Verificando documentos
-              {!isFinished && <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />}
-            </h2>
-            <div className="space-y-5 mb-8">
-              {docs.map((doc, idx) => {
-                const isVerified = idx < verifiedIndex;
-                const isCurrent = idx === verifiedIndex;
-                const isWaiting = idx > verifiedIndex;
-
-                return (
-                  <div key={doc.id} className="flex items-center gap-4">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
-                        isVerified
-                          ? "bg-[#BBE795] text-[#1a1a1a]"
-                          : isCurrent
-                          ? "bg-blue-50 text-blue-500"
-                          : "bg-gray-100 text-gray-400"
-                      }`}
-                    >
-                      {isVerified ? (
-                        <CheckCircle2 className="w-4 h-4" />
-                      ) : isCurrent ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Clock className="w-4 h-4" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p
-                        className={`text-sm font-semibold transition-colors duration-300 ${
-                          isVerified
-                            ? "text-[#1a1a1a]"
-                            : isCurrent
-                            ? "text-blue-600"
-                            : "text-gray-400"
-                        }`}
-                      >
-                        {isVerified
-                          ? `Requisito verificado: ${doc.title}`
-                          : isCurrent
-                          ? `Evaluando ${doc.title}...`
-                          : `En espera: ${doc.title}`}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div
-              className={`transition-all duration-700 overflow-hidden ${
-                isFinished ? "max-h-96 opacity-100 mt-8" : "max-h-0 opacity-0"
-              }`}
-            >
-              <div className="p-5 rounded-xl bg-[#F0FEE6] ring-1 ring-[#BBE795]/40 mb-6">
-                <p className="text-sm text-[#1a1a1a] leading-relaxed">
-                  <strong className="text-[#6abf1a] font-bold block mb-1">
-                    Validación automática completada exitosamente.
-                  </strong>
-                  Nuestra validación funciona utilizando procesamiento de lenguaje
-                  natural (NLP) para contrastar los documentos frente a las normativas
-                  de SARLAFT. Esta validación híbrida es automática y cuenta con la
-                  revisión de nuestro modelo <i>Human-In-The-Loop</i> para garantizar
-                  el 100% de precisión.
-                </p>
-              </div>
-              <div className="flex justify-end">
-                <Link href="/">
-                  <Button className="bg-[#1a1a1a] text-white hover:bg-black shadow-lg font-semibold">
-                    Volver al panel principal
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
+          <VerificationScreen docs={docs} />
         )}
       </main>
     </div>
