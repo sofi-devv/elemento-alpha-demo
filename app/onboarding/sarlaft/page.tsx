@@ -19,13 +19,16 @@ import {
   Loader2,
   ScanLine,
   Database,
+  Plus,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { FormWizard } from "@/components/sarlaft/FormWizard";
+import { ChatWizard } from "@/components/sarlaft/ChatWizard";
 import { FormsPreview } from "@/components/sarlaft/FormsPreview";
 import type { OcrReportItem } from "@/lib/sarlaft/ocrTypes";
 import type { SarlaftPackage } from "@/lib/sarlaft/schema";
 import { hasMissingFields, computeMissingFields } from "@/lib/sarlaft/missingFields";
+import { ensurePackageShape } from "@/lib/sarlaft/mergePackage";
 
 type DocStatus = "pending" | "uploaded";
 
@@ -118,17 +121,28 @@ function getRulesForDoc(docIdx: number) {
   return [0, 1, 2].map((i) => SARLAFT_RULES[(start + i) % SARLAFT_RULES.length]);
 }
 
+function formatBytes(bytes: number): string {
+  if (!bytes) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.min(sizes.length - 1, Math.floor(Math.log(bytes) / Math.log(k)));
+  return `${(bytes / Math.pow(k, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`;
+}
+
 function DocCard({
   doc,
-  hasFile,
-  onPickFile,
+  files,
+  onAddFiles,
   onRemoveFile,
+  onClearFiles,
 }: {
   doc: Document;
-  hasFile: boolean;
-  onPickFile: (file: File) => void;
-  onRemoveFile: () => void;
+  files: File[];
+  onAddFiles: (files: File[]) => void;
+  onRemoveFile: (index: number) => void;
+  onClearFiles: () => void;
 }) {
+  const hasFile = files.length > 0;
   const config = statusConfig[hasFile ? "uploaded" : "pending"];
   const Icon = doc.icon;
   const StatusIco = config.icon;
@@ -145,11 +159,12 @@ function DocCard({
       <input
         ref={inputRef}
         type="file"
+        multiple
         accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xlsm,.xls"
         className="hidden"
         onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onPickFile(f);
+          const picked = Array.from(e.target.files ?? []);
+          if (picked.length) onAddFiles(picked);
           e.target.value = "";
         }}
       />
@@ -175,25 +190,55 @@ function DocCard({
             className={`shrink-0 text-[10px] font-semibold h-5 px-2 transition-all duration-300 ${config.color}`}
           >
             <StatusIco className="w-3 h-3 mr-1" />
-            {config.label}
+            {hasFile ? `${files.length} archivo${files.length === 1 ? "" : "s"}` : config.label}
           </Badge>
         </div>
+
+        {hasFile && (
+          <ul className="mt-3 space-y-1.5">
+            {files.map((f, i) => (
+              <li
+                key={`${f.name}-${i}`}
+                className="flex items-center gap-2 text-xs bg-white/80 rounded-lg border border-[#BBE795]/40 px-2.5 py-1.5"
+              >
+                <FileText className="w-3.5 h-3.5 shrink-0 text-[#6abf1a]" />
+                <span className="min-w-0 truncate text-[#1a1a1a] font-medium">{f.name}</span>
+                <span className="ml-auto text-[10px] text-gray-400 tabular-nums shrink-0">
+                  {formatBytes(f.size)}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveFile(i);
+                  }}
+                  className="shrink-0 text-gray-400 hover:text-red-500 transition-colors"
+                  aria-label="Eliminar archivo"
+                  title="Eliminar"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
         <div className="flex items-center justify-between mt-3">
           <span className="inline-flex items-center text-[11px] text-gray-400 font-medium gap-1">
             <FileText className="w-3 h-3" />
             {doc.requirement}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {hasFile && (
               <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onRemoveFile();
+                  onClearFiles();
                 }}
                 className="text-xs text-red-500 hover:underline"
               >
-                Quitar
+                Quitar todos
               </button>
             )}
             <button
@@ -203,8 +248,8 @@ function DocCard({
                 hasFile ? "text-[#6abf1a]" : "text-gray-400 group-hover:text-[#6abf1a]"
               }`}
             >
-              {hasFile ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
-              <span>{hasFile ? "Cambiar archivo" : "Cargar documento"}</span>
+              {hasFile ? <Plus className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
+              <span>{hasFile ? "Añadir más archivos" : "Cargar documento(s)"}</span>
             </button>
           </div>
         </div>
@@ -215,15 +260,15 @@ function DocCard({
 
 const EXTRACT_SERVER_ORDER = ["camara", "rut", "cedula", "accionaria", "estados", "renta"] as const;
 
-function firstUploadedDocId(files: Record<string, File | undefined>): string | null {
+function firstUploadedDocId(files: Record<string, File[] | undefined>): string | null {
   for (const id of EXTRACT_SERVER_ORDER) {
-    if (files[id]) return id;
+    if (files[id]?.length) return id;
   }
   return null;
 }
 
-function countUploadedFiles(files: Record<string, File | undefined>): number {
-  return EXTRACT_SERVER_ORDER.filter((id) => files[id]).length;
+function countUploadedFiles(files: Record<string, File[] | undefined>): number {
+  return EXTRACT_SERVER_ORDER.reduce((acc, id) => acc + (files[id]?.length ?? 0), 0);
 }
 
 /** Misma estilo que la verificación; `activeDocId` sigue al documento que la API está procesando (hasta que Gemini responde). */
@@ -360,7 +405,7 @@ function ExtractionAnimationPanel({
 type AfterPhase = "none" | "extraction" | "extractingAnim" | "wizard" | "preview" | "error";
 
 export default function SarlaftPage() {
-  const [files, setFiles] = useState<Record<string, File | undefined>>({});
+  const [files, setFiles] = useState<Record<string, File[] | undefined>>({});
   const [docs] = useState<Document[]>(initialDocs);
   const [afterPhase, setAfterPhase] = useState<AfterPhase>("none");
   const [pkg, setPkg] = useState<SarlaftPackage | null>(null);
@@ -374,14 +419,39 @@ export default function SarlaftPage() {
   const [extractActivePending, setExtractActivePending] = useState<number | null>(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
-  const allFilesUploaded = docs.every((d) => files[d.id] != null);
-  const uploadedCount = docs.filter((d) => files[d.id]).length;
+  const allFilesUploaded = docs.every((d) => (files[d.id]?.length ?? 0) > 0);
+  const coveredDocsCount = docs.filter((d) => (files[d.id]?.length ?? 0) > 0).length;
+  const totalFilesCount = countUploadedFiles(files);
 
-  const setFile = useCallback((id: string, file: File) => {
-    setFiles((prev) => ({ ...prev, [id]: file }));
+  const addFiles = useCallback((id: string, picked: File[]) => {
+    if (!picked.length) return;
+    setFiles((prev) => {
+      const existing = prev[id] ?? [];
+      const byKey = new Set(existing.map((f) => `${f.name}:${f.size}:${f.lastModified}`));
+      const merged = [...existing];
+      for (const f of picked) {
+        const k = `${f.name}:${f.size}:${f.lastModified}`;
+        if (!byKey.has(k)) {
+          byKey.add(k);
+          merged.push(f);
+        }
+      }
+      return { ...prev, [id]: merged };
+    });
   }, []);
 
-  const removeFile = useCallback((id: string) => {
+  const removeFileAt = useCallback((id: string, index: number) => {
+    setFiles((prev) => {
+      const existing = prev[id] ?? [];
+      const next = existing.filter((_, i) => i !== index);
+      const n = { ...prev };
+      if (next.length === 0) delete n[id];
+      else n[id] = next;
+      return n;
+    });
+  }, []);
+
+  const clearFiles = useCallback((id: string) => {
     setFiles((prev) => {
       const n = { ...prev };
       delete n[id];
@@ -403,8 +473,8 @@ export default function SarlaftPage() {
     try {
       const formData = new FormData();
       for (const d of docs) {
-        const f = files[d.id];
-        if (f) formData.append(d.id, f);
+        const fs = files[d.id] ?? [];
+        for (const f of fs) formData.append(d.id, f);
       }
       if (typeof window !== "undefined") {
         const kyc = sessionStorage.getItem("kyc_financial_summary");
@@ -452,9 +522,10 @@ export default function SarlaftPage() {
           throw new Error(ev.message);
         } else if (ev.type === "complete") {
           sawComplete = true;
-          setPkg(ev.package);
+          const safePkg = ensurePackageShape(ev.package);
+          setPkg(safePkg);
           setOcrReport(Array.isArray(ev.ocrReport) ? ev.ocrReport : null);
-          setAfterPhase(hasMissingFields(ev.package) ? "wizard" : "preview");
+          setAfterPhase(hasMissingFields(safePkg) ? "wizard" : "preview");
         }
       };
       while (true) {
@@ -530,7 +601,10 @@ export default function SarlaftPage() {
             </div>
           </div>
           <div className="text-sm text-gray-500">
-            <span className="font-semibold text-[#1a1a1a]">{uploadedCount}</span> de {docs.length} documentos
+            <span className="font-semibold text-[#1a1a1a]">{coveredDocsCount}</span> de {docs.length} documentos
+            {totalFilesCount > coveredDocsCount && (
+              <span className="ml-1 text-xs text-gray-400">· {totalFilesCount} archivos</span>
+            )}
           </div>
         </div>
       </header>
@@ -554,24 +628,30 @@ export default function SarlaftPage() {
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-semibold text-[#1a1a1a]">Progreso de carga</span>
                 <span className={`text-sm font-bold ${allFilesUploaded ? "text-[#6abf1a]" : "text-gray-400"}`}>
-                  {Math.round((uploadedCount / docs.length) * 100)}%
+                  {Math.round((coveredDocsCount / docs.length) * 100)}%
                 </span>
               </div>
               <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-[#BBE795] to-[#7dd83a]"
-                  style={{ width: `${(uploadedCount / docs.length) * 100}%` }}
+                  style={{ width: `${(coveredDocsCount / docs.length) * 100}%` }}
                 />
               </div>
+              {totalFilesCount > 0 && (
+                <p className="text-[11px] text-gray-400 mt-2">
+                  {totalFilesCount} archivo{totalFilesCount === 1 ? "" : "s"} listos para análisis.
+                </p>
+              )}
             </div>
             <div className="grid gap-3 mb-8">
               {docs.map((doc) => (
                 <DocCard
                   key={doc.id}
                   doc={doc}
-                  hasFile={!!files[doc.id]}
-                  onPickFile={(f) => setFile(doc.id, f)}
-                  onRemoveFile={() => removeFile(doc.id)}
+                  files={files[doc.id] ?? []}
+                  onAddFiles={(fs) => addFiles(doc.id, fs)}
+                  onRemoveFile={(i) => removeFileAt(doc.id, i)}
+                  onClearFiles={() => clearFiles(doc.id)}
                 />
               ))}
             </div>
@@ -662,13 +742,15 @@ export default function SarlaftPage() {
         )}
 
         {afterPhase === "wizard" && pkg && (
-          <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-6">
-            <h2 className="text-lg font-bold text-[#1a1a1a] mb-1">Completar datos faltantes</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              {computeMissingFields(pkg).length} campo(s) requieren confirmación.
-            </p>
-            {extractError && <p className="text-sm text-red-500 mb-4">{extractError}</p>}
-            <FormWizard package={pkg} missing={computeMissingFields(pkg)} onComplete={onWizardDone} onUpdate={setPkg} />
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-lg font-bold text-[#1a1a1a] mb-1">Completar datos faltantes</h2>
+              <p className="text-sm text-gray-500">
+                {computeMissingFields(pkg).length} campo(s) requieren confirmación. El asistente te va a preguntar uno a uno.
+              </p>
+            </div>
+            {extractError && <p className="text-sm text-red-500">{extractError}</p>}
+            <ChatWizard package={pkg} missing={computeMissingFields(pkg)} onComplete={onWizardDone} onUpdate={setPkg} />
           </div>
         )}
 

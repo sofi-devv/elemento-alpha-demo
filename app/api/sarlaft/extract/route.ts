@@ -322,10 +322,12 @@ export async function POST(request: NextRequest) {
 
     const prepared: PreparedDoc[] = [];
     for (const id of DOC_IDS) {
-      const f = formData.get(id);
-      if (f && f instanceof File && f.size > 0) {
-        const p = await prepareOneDoc(id, f);
-        if (p) prepared.push(p);
+      const entries = formData.getAll(id);
+      for (const entry of entries) {
+        if (entry instanceof File && entry.size > 0) {
+          const p = await prepareOneDoc(id, entry);
+          if (p) prepared.push(p);
+        }
       }
     }
 
