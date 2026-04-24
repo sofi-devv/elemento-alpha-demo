@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,7 +8,6 @@ import {
   Upload,
   CheckCircle2,
   Clock,
-  AlertCircle,
   FileText,
   Building2,
   Receipt,
@@ -17,15 +16,18 @@ import {
   BarChart2,
   Landmark,
   ChevronRight,
-  X,
   Loader2,
-  ShieldCheck,
   ScanLine,
   Database,
 } from "lucide-react";
 import Link from "next/link";
+import { FormWizard } from "@/components/sarlaft/FormWizard";
+import { FormsPreview } from "@/components/sarlaft/FormsPreview";
+import type { OcrReportItem } from "@/lib/sarlaft/ocrTypes";
+import type { SarlaftPackage } from "@/lib/sarlaft/schema";
+import { hasMissingFields, computeMissingFields } from "@/lib/sarlaft/missingFields";
 
-type DocStatus = "pending" | "uploaded" | "reviewing" | "approved";
+type DocStatus = "pending" | "uploaded";
 
 interface Document {
   id: string;
@@ -38,20 +40,10 @@ interface Document {
 
 const initialDocs: Document[] = [
   {
-    id: "sarlaft",
-    icon: FileText,
-    title: "Formulario de Vinculación SARLAFT",
-    description:
-      "Debidamente diligenciado y firmado por el representante legal.",
-    requirement: "PDF · Firmado",
-    status: "pending",
-  },
-  {
     id: "camara",
     icon: Building2,
     title: "Certificado de Existencia y Representación Legal",
-    description:
-      "Expedido por la Cámara de Comercio con vigencia no mayor a 90 días.",
+    description: "Expedido por la Cámara de Comercio con vigencia no mayor a 90 días.",
     requirement: "PDF · Vigencia máx. 90 días",
     status: "pending",
   },
@@ -75,8 +67,7 @@ const initialDocs: Document[] = [
     id: "accionaria",
     icon: Users,
     title: "Composición Accionaria",
-    description:
-      "Documento que identifique a los socios o accionistas con participación igual o superior al 5% (Beneficiario Final).",
+    description: "Socios o accionistas con participación ≥ 5% (Beneficiario final).",
     requirement: "PDF · Firmado por Rep. Legal",
     status: "pending",
   },
@@ -84,8 +75,8 @@ const initialDocs: Document[] = [
     id: "estados",
     icon: BarChart2,
     title: "Estados Financieros",
-    description: "Generalmente del último corte anual o del año inmediatamente anterior.",
-    requirement: "PDF · Certificados por contador",
+    description: "Último corte anual o año inmediatamente anterior.",
+    requirement: "PDF · Certificados",
     status: "pending",
   },
   {
@@ -93,7 +84,7 @@ const initialDocs: Document[] = [
     icon: Landmark,
     title: "Declaración de Renta",
     description: "Copia del último periodo gravable disponible.",
-    requirement: "PDF · Último periodo gravable",
+    requirement: "PDF",
     status: "pending",
   },
 ];
@@ -109,98 +100,8 @@ const statusConfig: Record<DocStatus, { label: string; color: string; icon: Reac
     color: "border-[#BBE795] text-[#6abf1a]",
     icon: CheckCircle2,
   },
-  reviewing: {
-    label: "En revisión",
-    color: "border-amber-300 text-amber-500",
-    icon: AlertCircle,
-  },
-  approved: {
-    label: "Aprobado",
-    color: "bg-[#BBE795] text-[#1a1a1a] border-transparent",
-    icon: CheckCircle2,
-  },
 };
 
-function DocCard({
-  doc,
-  onToggle,
-}: {
-  doc: Document;
-  onToggle: (id: string) => void;
-}) {
-  const config = statusConfig[doc.status];
-  const Icon = doc.icon;
-  const StatusIco = config.icon;
-  const isUploaded = doc.status !== "pending";
-
-  return (
-    <div
-      className={`group relative flex gap-4 p-4 rounded-2xl ring-1 transition-all duration-300 cursor-pointer
-        ${isUploaded
-          ? "ring-[#BBE795]/40 bg-[#F0FEE6]/40 hover:ring-[#BBE795]/60"
-          : "ring-gray-100 bg-white hover:ring-[#BBE795]/30 hover:shadow-sm"
-        }`}
-      onClick={() => onToggle(doc.id)}
-    >
-      {/* Icon */}
-      <div
-        className={`flex items-center justify-center w-11 h-11 rounded-xl shrink-0 transition-colors duration-300 ${
-          isUploaded ? "bg-[#BBE795]/20" : "bg-gray-50 group-hover:bg-[#F0FEE6]"
-        }`}
-      >
-        <Icon
-          className={`w-5 h-5 transition-colors duration-300 ${
-            isUploaded ? "text-[#6abf1a]" : "text-gray-400 group-hover:text-[#6abf1a]"
-          }`}
-        />
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-[#1a1a1a] leading-snug">{doc.title}</p>
-            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{doc.description}</p>
-          </div>
-          <Badge
-            variant="outline"
-            className={`shrink-0 text-[10px] font-semibold h-5 px-2 transition-all duration-300 ${config.color}`}
-          >
-            <StatusIco className="w-3 h-3 mr-1" />
-            {config.label}
-          </Badge>
-        </div>
-
-        {/* Requirement tag + Upload action */}
-        <div className="flex items-center justify-between mt-3">
-          <span className="inline-flex items-center text-[11px] text-gray-400 font-medium gap-1">
-            <FileText className="w-3 h-3" />
-            {doc.requirement}
-          </span>
-          <div
-            className={`flex items-center gap-1.5 text-xs font-semibold transition-all duration-200 ${
-              isUploaded ? "text-[#6abf1a]" : "text-gray-400 group-hover:text-[#6abf1a]"
-            }`}
-          >
-            {isUploaded ? (
-              <>
-                <span>Documento cargado</span>
-                <X className="w-3.5 h-3.5" />
-              </>
-            ) : (
-              <>
-                <Upload className="w-3.5 h-3.5" />
-                <span>Cargar documento</span>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Reglas SARLAFT que se validan por documento ────────────────────────────
 const SARLAFT_RULES = [
   { label: "Lista OFAC / Clinton", db: "US Treasury" },
   { label: "Lista Consolidada ONU", db: "CSNU · ONU" },
@@ -217,99 +118,154 @@ function getRulesForDoc(docIdx: number) {
   return [0, 1, 2].map((i) => SARLAFT_RULES[(start + i) % SARLAFT_RULES.length]);
 }
 
-// ── Pantalla de verificación animada ─────────────────────────────────────────
-function VerificationScreen({ docs }: { docs: Document[] }) {
-  const [currentDocIdx, setCurrentDocIdx] = useState(0);
-  const [phase, setPhase] = useState<"scanning" | "checking" | "approved">("scanning");
-  const [rulesVisible, setRulesVisible] = useState(0);
-  const [approvedDocs, setApprovedDocs] = useState<number[]>([]);
-  const [allDone, setAllDone] = useState(false);
-  const [scanPos, setScanPos] = useState(0);
+function DocCard({
+  doc,
+  hasFile,
+  onPickFile,
+  onRemoveFile,
+}: {
+  doc: Document;
+  hasFile: boolean;
+  onPickFile: (file: File) => void;
+  onRemoveFile: () => void;
+}) {
+  const config = statusConfig[hasFile ? "uploaded" : "pending"];
+  const Icon = doc.icon;
+  const StatusIco = config.icon;
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Scan line animation
+  return (
+    <div
+      className={`group relative flex gap-4 p-4 rounded-2xl ring-1 transition-all duration-300 ${
+        hasFile
+          ? "ring-[#BBE795]/40 bg-[#F0FEE6]/40 hover:ring-[#BBE795]/60"
+          : "ring-gray-100 bg-white hover:ring-[#BBE795]/30 hover:shadow-sm"
+      }`}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xlsm,.xls"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onPickFile(f);
+          e.target.value = "";
+        }}
+      />
+      <div
+        className={`flex items-center justify-center w-11 h-11 rounded-xl shrink-0 transition-colors duration-300 ${
+          hasFile ? "bg-[#BBE795]/20" : "bg-gray-50 group-hover:bg-[#F0FEE6]"
+        }`}
+      >
+        <Icon
+          className={`w-5 h-5 transition-colors duration-300 ${
+            hasFile ? "text-[#6abf1a]" : "text-gray-400 group-hover:text-[#6abf1a]"
+          }`}
+        />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-[#1a1a1a] leading-snug">{doc.title}</p>
+            <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{doc.description}</p>
+          </div>
+          <Badge
+            variant="outline"
+            className={`shrink-0 text-[10px] font-semibold h-5 px-2 transition-all duration-300 ${config.color}`}
+          >
+            <StatusIco className="w-3 h-3 mr-1" />
+            {config.label}
+          </Badge>
+        </div>
+        <div className="flex items-center justify-between mt-3">
+          <span className="inline-flex items-center text-[11px] text-gray-400 font-medium gap-1">
+            <FileText className="w-3 h-3" />
+            {doc.requirement}
+          </span>
+          <div className="flex items-center gap-2">
+            {hasFile && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRemoveFile();
+                }}
+                className="text-xs text-red-500 hover:underline"
+              >
+                Quitar
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className={`flex items-center gap-1.5 text-xs font-semibold transition-all duration-200 ${
+                hasFile ? "text-[#6abf1a]" : "text-gray-400 group-hover:text-[#6abf1a]"
+              }`}
+            >
+              {hasFile ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Upload className="w-3.5 h-3.5" />}
+              <span>{hasFile ? "Cambiar archivo" : "Cargar documento"}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const EXTRACT_SERVER_ORDER = ["camara", "rut", "cedula", "accionaria", "estados", "renta"] as const;
+
+function firstUploadedDocId(files: Record<string, File | undefined>): string | null {
+  for (const id of EXTRACT_SERVER_ORDER) {
+    if (files[id]) return id;
+  }
+  return null;
+}
+
+function countUploadedFiles(files: Record<string, File | undefined>): number {
+  return EXTRACT_SERVER_ORDER.filter((id) => files[id]).length;
+}
+
+/** Misma estilo que la verificación; `activeDocId` sigue al documento que la API está procesando (hasta que Gemini responde). */
+function ExtractionAnimationPanel({
+  docs,
+  activeDocId,
+  stepIndex,
+  stepTotal,
+  activePageCount,
+  activePending,
+}: {
+  docs: Document[];
+  activeDocId: string | null;
+  stepIndex: number;
+  stepTotal: number;
+  activePageCount: number | null;
+  activePending: number | null;
+}) {
+  const [scanPos, setScanPos] = useState(0);
+  const currentDocIdx = Math.max(
+    0,
+    activeDocId ? docs.findIndex((d) => d.id === activeDocId) : 0
+  );
+  const rules = getRulesForDoc(currentDocIdx);
+
   useEffect(() => {
-    if (phase !== "scanning") { setScanPos(0); return; }
     const interval = setInterval(() => {
       setScanPos((p) => (p >= 100 ? 0 : p + 2));
     }, 18);
     return () => clearInterval(interval);
-  }, [phase]);
+  }, []);
 
-  // State machine
-  useEffect(() => {
-    if (allDone) return;
-    const rules = getRulesForDoc(currentDocIdx);
-
-    if (phase === "scanning") {
-      const t = setTimeout(() => setPhase("checking"), 1400);
-      return () => clearTimeout(t);
-    }
-    if (phase === "checking") {
-      if (rulesVisible < rules.length) {
-        const t = setTimeout(() => setRulesVisible((r) => r + 1), 650);
-        return () => clearTimeout(t);
-      }
-      const t = setTimeout(() => setPhase("approved"), 500);
-      return () => clearTimeout(t);
-    }
-    if (phase === "approved") {
-      const t = setTimeout(() => {
-        setApprovedDocs((prev) => [...prev, currentDocIdx]);
-        const next = currentDocIdx + 1;
-        if (next >= docs.length) {
-          setAllDone(true);
-        } else {
-          setCurrentDocIdx(next);
-          setPhase("scanning");
-          setRulesVisible(0);
-        }
-      }, 900);
-      return () => clearTimeout(t);
-    }
-  }, [phase, rulesVisible, currentDocIdx, docs.length, allDone]);
-
-  const currentDoc = docs[currentDocIdx];
+  const currentDoc = docs[currentDocIdx] ?? docs[0];
   const CurrentIcon = currentDoc?.icon ?? FileText;
-  const rules = getRulesForDoc(currentDocIdx);
-
-  if (allDone) {
-    return (
-      <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-10 text-center animate-in fade-in duration-700">
-        <div className="w-20 h-20 rounded-full bg-[#BBE795] flex items-center justify-center mx-auto mb-5 shadow-[0_0_40px_rgba(187,231,149,0.5)]">
-          <ShieldCheck className="w-10 h-10 text-[#1a1a1a]" />
-        </div>
-        <h2 className="text-2xl font-bold text-[#1a1a1a] mb-2">Validación SARLAFT completada</h2>
-        <p className="text-sm text-gray-500 max-w-md mx-auto leading-relaxed mb-2">
-          Los <strong>{docs.length} documentos</strong> fueron validados contra las listas restrictivas internacionales y la normativa colombiana de prevención de lavado de activos.
-        </p>
-        <p className="text-xs text-gray-400 max-w-md mx-auto leading-relaxed mb-8">
-          Esta validación emplea procesamiento NLP con revisión <em>Human-in-the-Loop</em> para garantizar cumplimiento regulatorio.
-        </p>
-        <div className="grid grid-cols-2 gap-2 mb-8 max-w-sm mx-auto">
-          {SARLAFT_RULES.slice(0, 6).map((r) => (
-            <div key={r.label} className="flex items-center gap-2 text-xs text-left bg-[#F0FEE6] rounded-lg px-3 py-2 ring-1 ring-[#BBE795]/30">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#6abf1a] shrink-0" />
-              <span className="text-gray-600 font-medium">{r.db}</span>
-            </div>
-          ))}
-        </div>
-        <Link href="/">
-          <Button className="bg-[#1a1a1a] text-white hover:bg-black shadow-lg font-semibold">
-            Volver al panel principal
-          </Button>
-        </Link>
-      </div>
-    );
-  }
 
   return (
-    <div className="space-y-5">
-      {/* Encabezado de progreso */}
+    <div className="space-y-5 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[11px] font-semibold text-[#6abf1a] uppercase tracking-widest mb-0.5">Verificación SARLAFT</p>
+          <p className="text-[11px] font-semibold text-[#6abf1a] uppercase tracking-widest mb-0.5">Extracción con IA</p>
           <h2 className="text-lg font-bold text-[#1a1a1a]">
-            Documento {currentDocIdx + 1} de {docs.length}
+            Procesando documento {stepIndex} de {stepTotal}
           </h2>
         </div>
         <div className="flex items-center gap-2 text-xs font-semibold text-blue-500 bg-blue-50 px-3 py-1.5 rounded-full ring-1 ring-blue-100">
@@ -317,326 +273,427 @@ function VerificationScreen({ docs }: { docs: Document[] }) {
           En proceso
         </div>
       </div>
-
-      {/* Animación principal: Documento ↔ SARLAFT */}
       <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-6 overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center min-h-[260px]">
-
-          {/* ── Panel izquierdo: Documento ── */}
+        <div className="grid grid-cols-[1fr_auto_1fr] gap-4 items-center min-h-[220px]">
           <div className="flex flex-col items-center gap-3">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Documentación</p>
             <div className="relative w-full max-w-[180px] mx-auto">
-              {/* Documento visual */}
-              <div className={`relative rounded-xl overflow-hidden border-2 transition-all duration-500 ${
-                phase === "approved" ? "border-[#BBE795] shadow-[0_0_20px_rgba(187,231,149,0.4)]" : "border-gray-200"
-              } bg-white p-4 min-h-[180px]`}>
-                {/* Scan line */}
-                {phase === "scanning" && (
-                  <div
-                    className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#6abf1a] to-transparent opacity-80 transition-none z-10"
-                    style={{ top: `${scanPos}%` }}
-                  />
-                )}
-                {/* Document content mockup */}
-                <div className={`flex items-center justify-center w-10 h-10 rounded-xl mb-3 mx-auto transition-colors duration-500 ${
-                  phase === "approved" ? "bg-[#BBE795]" : "bg-gray-100"
-                }`}>
-                  <CurrentIcon className={`w-5 h-5 transition-colors duration-500 ${
-                    phase === "approved" ? "text-[#1a1a1a]" : "text-gray-400"
-                  }`} />
+              <div className="relative rounded-xl overflow-hidden border-2 border-gray-200 bg-white p-4 min-h-[180px]">
+                <div
+                  className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[#6abf1a] to-transparent opacity-80 z-10"
+                  style={{ top: `${scanPos}%` }}
+                />
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl mb-3 mx-auto bg-gray-100">
+                  <CurrentIcon className="w-5 h-5 text-gray-500" />
                 </div>
                 <div className="space-y-1.5">
                   {[100, 75, 90, 60, 80].map((w, i) => (
                     <div
                       key={i}
-                      className={`h-1.5 rounded-full transition-colors duration-500 ${
-                        phase === "scanning" && scanPos > i * 20
-                          ? "bg-[#BBE795]/60"
-                          : phase === "approved"
-                          ? "bg-[#BBE795]/40"
-                          : "bg-gray-100"
+                      className={`h-1.5 rounded-full ${
+                        scanPos > i * 20 ? "bg-[#BBE795]/60" : "bg-gray-100"
                       }`}
                       style={{ width: `${w}%` }}
                     />
                   ))}
                 </div>
-                {/* Approved badge */}
-                {phase === "approved" && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-[#F0FEE6]/80 animate-in fade-in duration-300">
-                    <div className="flex flex-col items-center gap-1">
-                      <CheckCircle2 className="w-8 h-8 text-[#6abf1a]" />
-                      <span className="text-xs font-bold text-[#6abf1a]">Aprobado</span>
-                    </div>
-                  </div>
-                )}
               </div>
-              <p className="text-[11px] text-center text-gray-500 mt-2 font-medium leading-snug">{currentDoc?.title}</p>
+              <p className="text-[11px] text-center text-gray-500 mt-2 font-medium leading-snug line-clamp-2">
+                {currentDoc?.title}
+              </p>
             </div>
           </div>
-
-          {/* ── Centro: flujo animado ── */}
           <div className="flex flex-col items-center gap-1 px-1">
-            {["↔", "↔", "↔"].map((_, i) => (
-              <div
-                key={i}
-                className={`w-px h-5 rounded-full transition-all duration-300 ${
-                  phase === "checking" ? "bg-[#BBE795]" : "bg-gray-200"
-                }`}
-                style={{ animationDelay: `${i * 0.1}s` }}
-              />
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="w-px h-5 rounded-full bg-[#BBE795]" />
             ))}
-            <div className={`my-1 rounded-full p-1.5 transition-all duration-500 ${
-              phase === "checking" ? "bg-[#BBE795]/20 ring-1 ring-[#BBE795]/40" : "bg-gray-50"
-            }`}>
-              <Database className={`w-4 h-4 transition-colors duration-300 ${
-                phase === "checking" ? "text-[#6abf1a]" : "text-gray-300"
-              }`} />
+            <div className="my-1 rounded-full p-1.5 bg-[#BBE795]/20 ring-1 ring-[#BBE795]/40">
+              <Database className="w-4 h-4 text-[#6abf1a]" />
             </div>
-            {["↔", "↔", "↔"].map((_, i) => (
-              <div
-                key={i}
-                className={`w-px h-5 rounded-full transition-all duration-300 ${
-                  phase === "checking" ? "bg-[#BBE795]" : "bg-gray-200"
-                }`}
-              />
+            {[0, 1, 2].map((i) => (
+              <div key={i + 3} className="w-px h-5 rounded-full bg-[#BBE795]" />
             ))}
           </div>
-
-          {/* ── Panel derecho: Reglas SARLAFT ── */}
           <div className="flex flex-col gap-2">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">SARLAFT</p>
-            {rules.map((rule, i) => {
-              const visible = i < rulesVisible || phase === "approved";
-              const approved = phase === "approved" || i < rulesVisible;
-              return (
-                <div
-                  key={rule.label}
-                  className={`transition-all duration-500 ${visible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"}`}
-                >
-                  <div className={`flex items-start gap-2 p-2.5 rounded-xl ring-1 transition-all duration-300 ${
-                    approved
-                      ? "bg-[#F0FEE6] ring-[#BBE795]/40"
-                      : visible
-                      ? "bg-blue-50 ring-blue-100"
-                      : "bg-gray-50 ring-gray-100"
-                  }`}>
-                    <div className={`mt-0.5 shrink-0 w-4 h-4 rounded-full flex items-center justify-center transition-all duration-300 ${
-                      approved ? "bg-[#BBE795]" : "bg-blue-100"
-                    }`}>
-                      {approved
-                        ? <CheckCircle2 className="w-2.5 h-2.5 text-[#1a1a1a]" />
-                        : <Loader2 className="w-2.5 h-2.5 text-blue-500 animate-spin" />
-                      }
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-semibold text-[#1a1a1a] leading-snug">{rule.label}</p>
-                      <p className="text-[10px] text-gray-400 font-medium">{rule.db}</p>
-                    </div>
-                  </div>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">SARLAFT / Formularios</p>
+            {rules.map((rule) => (
+              <div
+                key={rule.label}
+                className="flex items-start gap-2 p-2.5 rounded-xl ring-1 bg-[#F0FEE6]/80 ring-[#BBE795]/30"
+              >
+                <div className="mt-0.5 w-4 h-4 rounded-full flex items-center justify-center bg-blue-100">
+                  <Loader2 className="w-2.5 h-2.5 text-blue-500 animate-spin" />
                 </div>
-              );
-            })}
-            {/* Reglas pendientes (placeholders) */}
-            {phase === "scanning" && (
-              <div className="space-y-2 mt-1">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="h-12 rounded-xl bg-gray-50 ring-1 ring-gray-100 animate-pulse" />
-                ))}
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-[#1a1a1a] leading-snug">{rule.label}</p>
+                  <p className="text-[10px] text-gray-400 font-medium">{rule.db}</p>
+                </div>
               </div>
-            )}
+            ))}
+            <div className="space-y-2 mt-1">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="h-12 rounded-xl bg-gray-50 ring-1 ring-gray-100 animate-pulse" />
+              ))}
+            </div>
           </div>
         </div>
-
-        {/* Barra de estado inferior */}
-        <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
-          <ScanLine className={`w-4 h-4 shrink-0 transition-colors duration-300 ${
-            phase === "scanning" ? "text-[#6abf1a] animate-pulse" : phase === "checking" ? "text-blue-400" : "text-[#6abf1a]"
-          }`} />
-          <p className="text-xs text-gray-500 font-medium">
-            {phase === "scanning" && "Escaneando documento y extrayendo metadatos..."}
-            {phase === "checking" && `Cruzando con bases de datos SARLAFT — ${rulesVisible}/${rules.length} verificaciones`}
-            {phase === "approved" && "✓ Documento validado exitosamente"}
-          </p>
+        <div className="mt-4 pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <ScanLine className="w-4 h-4 shrink-0 text-[#6abf1a] animate-pulse" />
+            <p className="text-xs text-gray-500 font-medium truncate">
+              {activePageCount && activePageCount > 1
+                ? `Leyendo ${activePageCount} páginas como imágenes…`
+                : "Procesando documento como imagen…"}
+            </p>
+          </div>
+          {activePending !== null && (
+            <span className="sm:ml-auto text-[11px] font-semibold text-[#6abf1a] bg-[#F0FEE6] ring-1 ring-[#BBE795]/40 px-2 py-1 rounded-full w-fit">
+              {activePending === 0 ? "Sin pendientes — solo confirmando" : `${activePending} variables pendientes`}
+            </span>
+          )}
         </div>
       </div>
-
-      {/* Documentos ya verificados */}
-      {approvedDocs.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Verificados</p>
-          <div className="grid gap-2">
-            {approvedDocs.map((idx) => {
-              const d = docs[idx];
-              const Icon = d.icon;
-              return (
-                <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-[#F0FEE6]/60 ring-1 ring-[#BBE795]/30 animate-in fade-in duration-500">
-                  <div className="w-7 h-7 rounded-lg bg-[#BBE795] flex items-center justify-center shrink-0">
-                    <Icon className="w-3.5 h-3.5 text-[#1a1a1a]" />
-                  </div>
-                  <p className="text-xs font-semibold text-[#1a1a1a] flex-1 min-w-0 truncate">{d.title}</p>
-                  <CheckCircle2 className="w-4 h-4 text-[#6abf1a] shrink-0" />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
+type AfterPhase = "none" | "extraction" | "extractingAnim" | "wizard" | "preview" | "error";
+
 export default function SarlaftPage() {
-  const [docs, setDocs] = useState<Document[]>(initialDocs);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verifiedIndex, setVerifiedIndex] = useState(-1);
+  const [files, setFiles] = useState<Record<string, File | undefined>>({});
+  const [docs] = useState<Document[]>(initialDocs);
+  const [afterPhase, setAfterPhase] = useState<AfterPhase>("none");
+  const [pkg, setPkg] = useState<SarlaftPackage | null>(null);
+  const [ocrReport, setOcrReport] = useState<OcrReportItem[] | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractActiveDocId, setExtractActiveDocId] = useState<string | null>(null);
+  const [extractStepIndex, setExtractStepIndex] = useState(1);
+  const [extractStepTotal, setExtractStepTotal] = useState(1);
+  const [extractActivePageCount, setExtractActivePageCount] = useState<number | null>(null);
+  const [extractActivePending, setExtractActivePending] = useState<number | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
-  // Verification animation logic
-  useEffect(() => {
-    if (isVerifying && verifiedIndex < docs.length) {
-      const timer = setTimeout(() => {
-        setVerifiedIndex((prev) => prev + 1);
-      }, 700);
-      return () => clearTimeout(timer);
+  const allFilesUploaded = docs.every((d) => files[d.id] != null);
+  const uploadedCount = docs.filter((d) => files[d.id]).length;
+
+  const setFile = useCallback((id: string, file: File) => {
+    setFiles((prev) => ({ ...prev, [id]: file }));
+  }, []);
+
+  const removeFile = useCallback((id: string) => {
+    setFiles((prev) => {
+      const n = { ...prev };
+      delete n[id];
+      return n;
+    });
+  }, []);
+
+  const runExtract = useCallback(async () => {
+    setIsExtracting(true);
+    setExtractError(null);
+    setOcrReport(null);
+    const nDocs = countUploadedFiles(files);
+    setExtractStepTotal(Math.max(1, nDocs));
+    setExtractStepIndex(1);
+    setExtractActiveDocId(firstUploadedDocId(files));
+    setExtractActivePageCount(null);
+    setExtractActivePending(null);
+    let sawComplete = false;
+    try {
+      const formData = new FormData();
+      for (const d of docs) {
+        const f = files[d.id];
+        if (f) formData.append(d.id, f);
+      }
+      if (typeof window !== "undefined") {
+        const kyc = sessionStorage.getItem("kyc_financial_summary");
+        if (kyc) formData.append("financialSummary", kyc);
+      }
+      const res = await fetch("/api/sarlaft/extract", { method: "POST", body: formData });
+      const ct = res.headers.get("content-type") || "";
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error || "Error al extraer");
+      }
+      if (!ct.includes("ndjson") || !res.body) {
+        throw new Error("Respuesta de extracción no válida.");
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const handleLine = (line: string) => {
+        if (!line.trim()) return;
+        const ev = JSON.parse(line) as
+          | {
+              type: "doc_start";
+              docId: string;
+              fileName: string;
+              index: number;
+              total: number;
+              pageCount?: number;
+              kind?: string;
+              pendingCount?: number;
+            }
+          | { type: "doc_done"; docId: string; pendingCount?: number }
+          | { type: "complete"; package: SarlaftPackage; ocrReport: OcrReportItem[] }
+          | { type: "error"; message: string };
+        if (ev.type === "doc_start") {
+          setExtractActiveDocId(ev.docId);
+          setExtractStepIndex(ev.index);
+          setExtractStepTotal(ev.total);
+          setExtractActivePageCount(ev.pageCount ?? null);
+          setExtractActivePending(typeof ev.pendingCount === "number" ? ev.pendingCount : null);
+        } else if (ev.type === "doc_done") {
+          if (typeof ev.pendingCount === "number") {
+            setExtractActivePending(ev.pendingCount);
+          }
+        } else if (ev.type === "error") {
+          throw new Error(ev.message);
+        } else if (ev.type === "complete") {
+          sawComplete = true;
+          setPkg(ev.package);
+          setOcrReport(Array.isArray(ev.ocrReport) ? ev.ocrReport : null);
+          setAfterPhase(hasMissingFields(ev.package) ? "wizard" : "preview");
+        }
+      };
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          handleLine(line);
+        }
+      }
+      if (buffer.trim()) {
+        handleLine(buffer);
+      }
+      if (!sawComplete) {
+        throw new Error("La extracción no devolvió resultado completo.");
+      }
+    } catch (e) {
+      setExtractError(e instanceof Error ? e.message : "Error desconocido");
+      setAfterPhase("error");
+    } finally {
+      setIsExtracting(false);
+      setExtractActiveDocId(null);
     }
-  }, [isVerifying, verifiedIndex, docs.length]);
+  }, [docs, files]);
 
-  const toggleDoc = (id: string) => {
-    setDocs((prev) =>
-      prev.map((d) =>
-        d.id === id
-          ? { ...d, status: d.status === "pending" ? "uploaded" : "pending" }
-          : d
-      )
-    );
-  };
+  const onWizardDone = useCallback((p: SarlaftPackage) => {
+    setPkg(p);
+    setAfterPhase("preview");
+  }, []);
 
-  const uploaded = docs.filter((d) => d.status !== "pending").length;
-  const total = docs.length;
-  const progress = Math.round((uploaded / total) * 100);
-  const allDone = uploaded === total;
-  const isFinished = verifiedIndex >= docs.length;
+  const onGeneratePdf = useCallback(async () => {
+    if (!pkg) return;
+    setGeneratingPdf(true);
+    try {
+      const res = await fetch("/api/sarlaft/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ package: pkg }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Error al generar PDF");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "paquete_vinculacion_skandia.zip";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setExtractError(e instanceof Error ? e.message : "Error PDF");
+    } finally {
+      setGeneratingPdf(false);
+    }
+  }, [pkg]);
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-xl">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/">
-              <button className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 transition-colors">
+              <button type="button" className="flex items-center justify-center w-8 h-8 rounded-lg hover:bg-gray-100 transition-colors">
                 <ArrowLeft className="w-4 h-4 text-gray-500" />
               </button>
             </Link>
             <div>
-              <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-                Onboarding · Fase 1
-              </p>
-              <h1 className="text-base font-semibold text-[#1a1a1a] leading-tight">
-                Procedimiento SARLAFT
-              </h1>
+              <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Onboarding · Fase 1</p>
+              <h1 className="text-base font-semibold text-[#1a1a1a] leading-tight">Procedimiento SARLAFT</h1>
             </div>
           </div>
-          {!isVerifying ? (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <span className="font-semibold text-[#1a1a1a]">{uploaded}</span>
-              <span>de {total} documentos</span>
-            </div>
-          ) : !isFinished ? (
-            <div className="flex items-center gap-2 text-sm text-blue-500 font-medium">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Verificando...</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-[#6abf1a] font-medium">
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Verificación completada</span>
-            </div>
-          )}
+          <div className="text-sm text-gray-500">
+            <span className="font-semibold text-[#1a1a1a]">{uploadedCount}</span> de {docs.length} documentos
+          </div>
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8">
-        {!isVerifying ? (
+        {afterPhase === "none" && (
           <>
-            {/* Hero */}
             <div className="mb-8">
               <div className="flex items-center gap-2 mb-2">
                 <Building2 className="w-5 h-5 text-[#6abf1a]" />
-                <span className="text-sm font-semibold text-[#6abf1a] uppercase tracking-wider">
-                  Vinculación Empresarial
-                </span>
+                <span className="text-sm font-semibold text-[#6abf1a] uppercase tracking-wider">Vinculación Empresarial</span>
               </div>
-              <h2 className="text-2xl font-bold text-[#1a1a1a] tracking-tight mb-2">
-                Documentos requeridos
-              </h2>
+              <h2 className="text-2xl font-bold text-[#1a1a1a] tracking-tight mb-2">Soporte documental</h2>
               <p className="text-sm text-gray-500 leading-relaxed max-w-xl">
-                Para cumplir con la normativa SARLAFT, carga los siguientes
-                documentos. Todos los archivos deben estar vigentes y ser legibles.
+                El formulario de vinculación SARLAFT se genera en la app a partir de tu información; no debes
+                subirlo aquí. Carga solo los soportes (cámara de comercio, RUT, cédula del representante, etc.)
+                en PDF, imagen o Excel para que la IA extraiga los datos.
               </p>
             </div>
-
-            {/* Progress */}
             <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-5 mb-6">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-[#1a1a1a]">
-                  Progreso de carga
-                </span>
-                <span
-                  className={`text-sm font-bold ${
-                    allDone ? "text-[#6abf1a]" : "text-gray-400"
-                  }`}
-                >
-                  {progress}%
+                <span className="text-sm font-semibold text-[#1a1a1a]">Progreso de carga</span>
+                <span className={`text-sm font-bold ${allFilesUploaded ? "text-[#6abf1a]" : "text-gray-400"}`}>
+                  {Math.round((uploadedCount / docs.length) * 100)}%
                 </span>
               </div>
               <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r from-[#BBE795] to-[#7dd83a]"
-                  style={{ width: `${progress}%` }}
+                  style={{ width: `${(uploadedCount / docs.length) * 100}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-400 mt-2">
-                {allDone
-                  ? "✓ Todos los documentos han sido cargados"
-                  : `${total - uploaded} documento${total - uploaded !== 1 ? "s" : ""} pendiente${total - uploaded !== 1 ? "s" : ""}`}
-              </p>
             </div>
-
-            {/* Document Cards */}
             <div className="grid gap-3 mb-8">
               {docs.map((doc) => (
-                <DocCard key={doc.id} doc={doc} onToggle={toggleDoc} />
+                <DocCard
+                  key={doc.id}
+                  doc={doc}
+                  hasFile={!!files[doc.id]}
+                  onPickFile={(f) => setFile(doc.id, f)}
+                  onRemoveFile={() => removeFile(doc.id)}
+                />
               ))}
             </div>
-
-            {/* Footer CTA */}
             <div className="flex items-center justify-between p-5 rounded-2xl bg-white ring-1 ring-gray-100">
               <div>
                 <p className="text-sm font-semibold text-[#1a1a1a]">
-                  {allDone ? "¡Listo para revisar!" : "Completa todos los documentos"}
+                  {allFilesUploaded ? "Listo para extraer datos" : "Sube todos los documentos"}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5 max-w-sm">
-                  {allDone
-                    ? "Iniciará una validación automática estructurada con IA."
-                    : `Faltan ${total - uploaded} de ${total} documentos para continuar.`}
-                </p>
+                <p className="text-xs text-gray-400 mt-0.5 max-w-sm">Una sola secuencia: se analizará cada archivo por turno y se rellenarán los formularios.</p>
               </div>
               <Button
-                disabled={!allDone}
-                onClick={() => setIsVerifying(true)}
-                className={`flex items-center gap-2 font-semibold transition-all duration-300 ${
-                  allDone
+                disabled={!allFilesUploaded}
+                onClick={() => {
+                  setAfterPhase("extraction");
+                  void runExtract();
+                }}
+                className={`flex items-center gap-2 font-semibold ${
+                  allFilesUploaded
                     ? "bg-[#BBE795] text-[#1a1a1a] hover:bg-[#8fd94a] shadow-[0_4px_16px_rgba(187,231,149,0.35)]"
                     : "bg-gray-100 text-gray-400 cursor-not-allowed"
                 }`}
               >
-                Iniciar verificación estructurada
+                Extraer datos con IA
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </>
-        ) : (
-          <VerificationScreen docs={docs} />
+        )}
+
+        {afterPhase === "extraction" && (
+          <>
+            {isExtracting ? (
+              <ExtractionAnimationPanel
+                docs={docs}
+                activeDocId={extractActiveDocId}
+                stepIndex={extractStepIndex}
+                stepTotal={extractStepTotal}
+                activePageCount={extractActivePageCount}
+                activePending={extractActivePending}
+              />
+            ) : (
+              <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-12 text-center">
+                <Loader2 className="w-9 h-9 text-[#6abf1a] animate-spin mx-auto mb-3" />
+                <p className="text-sm text-gray-600">Iniciando análisis…</p>
+              </div>
+            )}
+          </>
+        )}
+
+        {afterPhase === "extractingAnim" && (
+          <ExtractionAnimationPanel
+            docs={docs}
+            activeDocId={extractActiveDocId}
+            stepIndex={extractStepIndex}
+            stepTotal={extractStepTotal}
+            activePageCount={extractActivePageCount}
+            activePending={extractActivePending}
+          />
+        )}
+
+        {afterPhase === "error" && (
+          <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-10 text-center">
+            <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <FileText className="w-6 h-6 text-red-500" />
+            </div>
+            <h2 className="text-lg font-bold text-[#1a1a1a] mb-1">No pudimos extraer la información</h2>
+            <p className="text-sm text-gray-500 max-w-md mx-auto">
+              {extractError || "Ocurrió un error al procesar tus documentos."}
+            </p>
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => setAfterPhase("none")}
+              >
+                Revisar documentos
+              </Button>
+              <Button
+                className="bg-[#BBE795] text-[#1a1a1a] hover:bg-[#8fd94a]"
+                onClick={() => {
+                  setAfterPhase("extractingAnim");
+                  void runExtract();
+                }}
+              >
+                Reintentar extracción
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {afterPhase === "wizard" && pkg && (
+          <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-6">
+            <h2 className="text-lg font-bold text-[#1a1a1a] mb-1">Completar datos faltantes</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              {computeMissingFields(pkg).length} campo(s) requieren confirmación.
+            </p>
+            {extractError && <p className="text-sm text-red-500 mb-4">{extractError}</p>}
+            <FormWizard package={pkg} missing={computeMissingFields(pkg)} onComplete={onWizardDone} onUpdate={setPkg} />
+          </div>
+        )}
+
+        {afterPhase === "preview" && pkg && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="text-lg font-bold text-[#1a1a1a]">Vista previa y exportación</h2>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setAfterPhase("wizard")}
+              >
+                Volver al asistente
+              </Button>
+            </div>
+            {extractError && <p className="text-sm text-red-500">{extractError}</p>}
+            <FormsPreview
+              value={pkg}
+              onChange={setPkg}
+              onGeneratePdf={onGeneratePdf}
+              generating={generatingPdf}
+              ocrReport={ocrReport}
+            />
+          </div>
         )}
       </main>
     </div>
