@@ -26,7 +26,7 @@ import {
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useVoiceAgent, type PortfolioRecommendation } from "@/hooks/useVoiceAgent";
+import { useVoiceAgent } from "@/hooks/useVoiceAgent";
 
 // ── Tipos ───────────────────────────────────────────────────────────────────
 type Phase = "upload" | "intro" | "kyc" | "risk" | "done";
@@ -243,102 +243,6 @@ function AnimatedOptions({
   );
 }
 
-// ── Datos de portafolios ─────────────────────────────────────────────────────
-const PORTFOLIOS: Record<string, {
-  color: string; ring: string; bg: string;
-  rentabilidad: string; plazoMin: string; liquidez: string; composicion: string;
-  tag: string;
-}> = {
-  conservador: {
-    color: "text-blue-600", ring: "ring-blue-200", bg: "bg-blue-50",
-    tag: "Bajo riesgo",
-    rentabilidad: "5.8% – 7.2% EA", plazoMin: "30 días",
-    liquidez: "Diaria", composicion: "100% Renta Fija / Mercado Monetario",
-  },
-  moderado: {
-    color: "text-amber-600", ring: "ring-amber-200", bg: "bg-amber-50",
-    tag: "Riesgo moderado",
-    rentabilidad: "8.5% – 12% EA", plazoMin: "6 meses",
-    liquidez: "Mensual", composicion: "65% Renta Fija / 35% Renta Variable",
-  },
-  agresivo: {
-    color: "text-[#6abf1a]", ring: "ring-[#BBE795]", bg: "bg-[#F0FEE6]",
-    tag: "Alto potencial",
-    rentabilidad: "14% – 22% EA", plazoMin: "24 meses",
-    liquidez: "Trimestral", composicion: "40% Renta Fija / 60% Renta Variable",
-  },
-};
-
-// ── Propuesta de portafolio ───────────────────────────────────────────────────
-function ProposalCard({ rec, onConfirm }: { rec: PortfolioRecommendation; onConfirm: () => void }) {
-  const p = PORTFOLIOS[rec.portfolio] ?? PORTFOLIOS.moderado;
-  return (
-    <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-6 space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-600">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold text-[#6abf1a] uppercase tracking-widest mb-1">
-            Propuesta de portafolio · Elemento Alpha
-          </p>
-          <h2 className="text-2xl font-bold text-[#1a1a1a] tracking-tight">{rec.nombre}</h2>
-          <span className={`inline-block mt-1.5 text-[11px] font-bold px-2.5 py-0.5 rounded-full ${p.bg} ${p.color} ring-1 ${p.ring}`}>
-            {p.tag}
-          </span>
-        </div>
-        <div className={`flex items-center justify-center w-14 h-14 rounded-2xl shrink-0 ${p.bg} ring-1 ${p.ring}`}>
-          <BarChart2 className={`w-7 h-7 ${p.color}`} />
-        </div>
-      </div>
-
-      {/* Razón */}
-      <div className={`p-4 rounded-xl ${p.bg} ring-1 ${p.ring}`}>
-        <p className="text-sm text-gray-700 leading-relaxed">
-          <span className={`font-semibold ${p.color}`}>Perfil {rec.perfil} · </span>
-          {rec.razon}
-        </p>
-        {rec.monto && rec.monto !== "no especificado" && (
-          <p className="text-xs text-gray-500 mt-1">Monto de inversión estimado: <span className="font-semibold text-[#1a1a1a]">{rec.monto}</span></p>
-        )}
-      </div>
-
-      {/* Métricas */}
-      <div className="grid grid-cols-2 gap-3">
-        {[
-          { label: "Rentabilidad esperada", value: p.rentabilidad },
-          { label: "Plazo mínimo", value: p.plazoMin },
-          { label: "Liquidez", value: p.liquidez },
-          { label: "Horizonte", value: rec.plazo },
-        ].map((item) => (
-          <div key={item.label} className="p-3 rounded-xl bg-gray-50 ring-1 ring-gray-100">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">{item.label}</p>
-            <p className="text-sm font-bold text-[#1a1a1a]">{item.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Composición */}
-      <div className="flex items-center gap-2 text-xs text-gray-500 bg-gray-50 rounded-xl px-4 py-3 ring-1 ring-gray-100">
-        <BarChart2 className="w-3.5 h-3.5 shrink-0 text-gray-400" />
-        <span><span className="font-semibold text-[#1a1a1a]">Composición: </span>{p.composicion}</span>
-      </div>
-
-      {/* CTA */}
-      <div className="flex items-center justify-between pt-2">
-        <p className="text-xs text-gray-400 max-w-xs leading-relaxed">
-          Esta propuesta fue generada a partir del perfilamiento de riesgo y tus estados financieros.
-        </p>
-        <Button
-          onClick={onConfirm}
-          className="bg-[#1a1a1a] text-white hover:bg-black shadow-lg font-semibold flex items-center gap-2 shrink-0"
-        >
-          Aceptar propuesta
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 // ── UI helpers ───────────────────────────────────────────────────────────────
 function VoiceDot({ speaking }: { speaking: boolean }) {
   return (
@@ -375,9 +279,6 @@ export default function KycPage() {
   const [financialContext, setFinancialContext] = useState<string | undefined>(undefined);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
 
-  // Recomendación de portafolio del agente de voz
-  const [portfolioRec, setPortfolioRec] = useState<PortfolioRecommendation | null>(null);
-
   // Selecciones del perfil de riesgo
   const [selectedRisk, setSelectedRisk] = useState<string | null>(null);
   const [selectedMarketUp, setSelectedMarketUp] = useState<string | null>(null);
@@ -394,11 +295,7 @@ export default function KycPage() {
     celular: "",
   });
 
-  const { startSession, endSession, isConnected, isConnecting, isSpeaking, error } = useVoiceAgent({
-    voiceName: "Zephyr",
-    financialContext,
-    onRecommendation: setPortfolioRec,
-  });
+  const { startSession, endSession, isConnected, isConnecting, isSpeaking, error } = useVoiceAgent({ voiceName: "Zephyr", financialContext });
 
   const kycValid =
     kyc.nombres.trim() &&
@@ -484,7 +381,7 @@ export default function KycPage() {
                 Estados Financieros
               </h2>
               <p className="text-sm text-gray-500 leading-relaxed">
-                Sube hasta 2 archivos de tus estados financieros (PDF, Excel o imagen). Nuestra IA los analizará para personalizar las recomendaciones del asesor de inversión.
+                Sube hasta 2 archivos de tus estados financieros (PDF o imagen). Nuestra IA los analizará para personalizar las recomendaciones del asesor de inversión.
               </p>
             </div>
 
@@ -504,12 +401,12 @@ export default function KycPage() {
                 <p className="text-sm font-semibold text-gray-700">
                   {uploadedFiles.length >= 2 ? "Máximo 2 archivos" : "Clic para subir o arrastra aquí"}
                 </p>
-                <p className="text-xs text-gray-400 mt-0.5">PDF, Excel (.xlsx), PNG, JPG · Máx. 2 archivos</p>
+                <p className="text-xs text-gray-400 mt-0.5">PDF, PNG, JPG · Máx. 2 archivos</p>
               </div>
               <input
                 id="financial-upload"
                 type="file"
-                accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
+                accept=".pdf,.png,.jpg,.jpeg"
                 multiple
                 className="hidden"
                 onChange={handleFileChange}
@@ -672,11 +569,6 @@ export default function KycPage() {
             )}
           </div>
         </div>
-        )}
-
-        {/* ── Propuesta de portafolio (aparece al recibir recomendación del agente) ── */}
-        {portfolioRec && (
-          <ProposalCard rec={portfolioRec} onConfirm={() => setPhase("done")} />
         )}
 
         {/* ── KYC Form ── */}

@@ -216,7 +216,7 @@ export function useVoiceAgent({
 
       // 3. Conectar a Gemini Live API
       const sessionPromise = ai.live.connect({
-        model: "gemini-2.0-flash-live-001",
+        model: "gemini-3.1-flash-live-preview",
         callbacks: {
           onopen: () => {
             setIsConnecting(false);
@@ -224,8 +224,11 @@ export function useVoiceAgent({
 
             // Pedirle a Gemini que inicie la conversación sin que el usuario tenga que hablar primero
             sessionPromise.then(session => {
-              session.sendClientContent({
-                turns: [{ role: "user", parts: [{ text: "Hola, acabo de entrar a la llamada. Por favor empieza según tus instrucciones." }] }],
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (session as any).send({
+                clientContent: {
+                  turns: [{ role: "user", parts: [{ text: "Hola, acabo de entrar a la llamada. Por favor empieza según tus instrucciones (preséntate y pide mi nombre)." }] }]
+                }
               });
             });
 
@@ -262,20 +265,10 @@ export function useVoiceAgent({
               stopAudioPlaybackInternal();
               setIsSpeaking(false);
             }
-            const parts = message.serverContent?.modelTurn?.parts ?? [];
-            for (const part of parts) {
-              if (part.inlineData?.data) {
-                playBase64Pcm(part.inlineData.data);
-              }
-              if (part.text) {
-                const match = part.text.match(/PORTFOLIO:\s*(\{[\s\S]*?\})/);
-                if (match) {
-                  try {
-                    const rec = JSON.parse(match[1]) as PortfolioRecommendation;
-                    onRecommendation?.(rec);
-                  } catch (_e) { /* JSON malformado, ignorar */ }
-                }
-              }
+            const base64Audio =
+              message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+            if (base64Audio) {
+              playBase64Pcm(base64Audio);
             }
           },
           onerror: (err) => {
@@ -295,7 +288,7 @@ export function useVoiceAgent({
           },
         },
         config: {
-          responseModalities: [Modality.AUDIO, Modality.TEXT],
+          responseModalities: [Modality.AUDIO],
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName },
