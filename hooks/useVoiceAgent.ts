@@ -172,7 +172,35 @@ export function useVoiceAgent({
       playAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
       nextPlayTimeRef.current = playAudioContextRef.current.currentTime;
 
-      // 2. Conectar a Gemini Live
+      // 2. Configurar micrófono ANTES de conectar a Gemini
+      audioContextRef.current = new AudioContext({ sampleRate: 16000 });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+
+      const workletCode = `
+        class AudioRecorder extends AudioWorkletProcessor {
+          process(inputs) {
+            const input = inputs[0];
+            if (input && input.length > 0) {
+              const channelData = input[0];
+              const pcm16 = new Int16Array(channelData.length);
+              for (let i = 0; i < channelData.length; i++) {
+                let s = Math.max(-1, Math.min(1, channelData[i]));
+                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+              }
+              this.port.postMessage(pcm16);
+            }
+            return true;
+          }
+        }
+        registerProcessor('audio-recorder', AudioRecorder);
+      `;
+      const blob = new Blob([workletCode], { type: "application/javascript" });
+      await audioContextRef.current.audioWorklet.addModule(URL.createObjectURL(blob));
+      const recorderNode = new AudioWorkletNode(audioContextRef.current, "audio-recorder");
+
+      // 3. Conectar a Gemini Live
       const sessionPromise = ai.live.connect({
         model: "gemini-3.1-flash-live-preview",
         config: {
@@ -185,77 +213,31 @@ export function useVoiceAgent({
           systemInstruction: buildSystemInstruction(financialContext, intakeData),
         },
         callbacks: {
-          onopen: async () => {
+          onopen: () => {
             setIsConnecting(false);
             setIsConnected(true);
 
-            // 3. Configurar micrófono DENTRO de onopen (patrón correcto)
-            try {
-              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-              streamRef.current = stream;
+            // 4. Activar envío de audio al conectar
+            recorderNode.port.onmessage = (e) => {
+              const pcm16 = e.data;
+              const buffer = new ArrayBuffer(pcm16.length * 2);
+              const view = new DataView(buffer);
+              for (let i = 0; i < pcm16.length; i++) view.setInt16(i * 2, pcm16[i], true);
+              let binary = "";
+              const bytes = new Uint8Array(buffer);
+              for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
 
-              audioContextRef.current = new AudioContext({ sampleRate: 16000 });
-              const source = audioContextRef.current.createMediaStreamSource(stream);
-
-              // AudioWorklet: mic → PCM16
-              const workletCode = `
-                class AudioRecorder extends AudioWorkletProcessor {
-                  process(inputs) {
-                    const input = inputs[0];
-                    if (input && input.length > 0) {
-                      const channelData = input[0];
-                      const pcm16 = new Int16Array(channelData.length);
-                      for (let i = 0; i < channelData.length; i++) {
-                        let s = Math.max(-1, Math.min(1, channelData[i]));
-                        pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                      }
-                      this.port.postMessage(pcm16);
-                    }
-                    return true;
-                  }
-                }
-                registerProcessor('audio-recorder', AudioRecorder);
-              `;
-              const blob = new Blob([workletCode], { type: "application/javascript" });
-              await audioContextRef.current.audioWorklet.addModule(URL.createObjectURL(blob));
-
-              const recorderNode = new AudioWorkletNode(audioContextRef.current, "audio-recorder");
-
-              // 4. Enviar chunks de audio a Gemini
-              recorderNode.port.onmessage = (e) => {
-                const pcm16 = e.data;
-                const buffer = new ArrayBuffer(pcm16.length * 2);
-                const view = new DataView(buffer);
-                for (let i = 0; i < pcm16.length; i++) view.setInt16(i * 2, pcm16[i], true);
-
-                let binary = "";
-                const bytes = new Uint8Array(buffer);
-                for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-                const base64 = window.btoa(binary);
-
-                // sessionPromise ya está resuelta aquí — .then() es síncrono
-                sessionPromise.then((session) => {
-                  try {
-                    session.sendRealtimeInput({
-                      audio: { data: base64, mimeType: "audio/pcm;rate=16000" },
-                    });
-                  } catch (_e) { /* WS cerrado, ignorar */ }
-                });
-              };
-
-              source.connect(recorderNode);
-
-              // Señalar al modelo que es su turno para que inicie la bienvenida
               sessionPromise.then((session) => {
                 try {
-                  session.sendClientContent({ turnComplete: true });
+                  session.sendRealtimeInput({
+                    audio: { data: window.btoa(binary), mimeType: "audio/pcm;rate=16000" },
+                  });
                 } catch (_e) {}
               });
-            } catch (micErr) {
-              setError("No se pudo acceder al micrófono.");
-              cleanup();
-              setIsConnected(false);
-            }
+            };
+
+            source.connect(recorderNode);
+            recorderNode.connect(audioContextRef.current!.destination);
           },
 
           onmessage: (message: LiveServerMessage) => {
