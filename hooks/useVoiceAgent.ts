@@ -3,7 +3,6 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 
-// Inicializar Gemini API — NEXT_PUBLIC_ para que esté disponible en el cliente
 const ai = new GoogleGenAI({
   apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY!,
 });
@@ -17,7 +16,10 @@ export interface PortfolioRecommendation {
   monto?: string;
 }
 
-function buildSystemInstruction(financialContext?: string, intakeData?: { nombre: string; empresa: string; sector: string }): string {
+function buildSystemInstruction(
+  financialContext?: string,
+  intakeData?: { nombre: string; empresa: string; sector: string }
+): string {
   const financialBlock = financialContext
     ? `\n\nCONTEXTO FINANCIERO DEL CLIENTE (extraído de sus estados financieros):\n---\n${financialContext}\n---\nUsa estos datos para personalizar y justificar la recomendación de portafolio.`
     : "";
@@ -32,7 +34,7 @@ Habla en español colombiano. Sé conciso, empático y profesional. NUNCA hagas 
 
 GUION (sigue este orden estrictamente, una pregunta a la vez):
 
-BIENVENIDA: Saluda al cliente por su nombre, menciona su empresa y dile que le harás 5 preguntas cortas para recomendarle el portafolio ideal.
+BIENVENIDA: Saluda al cliente por su nombre, menciona su empresa y dile que le harás 5 preguntas cortas para recomendarle el portafolio ideal. INICIA INMEDIATAMENTE al conectarte, sin esperar que el usuario hable primero.
 
 P1 — OBJETIVO: "¿Cuál es el principal objetivo de esta inversión? Por ejemplo: preservar el capital, hacer crecer el patrimonio, o financiar una meta específica."
 
@@ -68,66 +70,23 @@ export function useVoiceAgent({
   intakeData,
   onRecommendation,
 }: UseVoiceAgentOptions = {}) {
-  const transcriptBufferRef = useRef<string>("");
-  const onRecommendationRef = useRef(onRecommendation);
-  onRecommendationRef.current = onRecommendation;
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Todas las referencias de recursos — refs NO causan re-renders
+  // ── Refs de recursos ──────────────────────────────────────────────────────
   const sessionRef = useRef<any>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const playAudioContextRef = useRef<AudioContext | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);      // captura 16kHz
+  const playAudioContextRef = useRef<AudioContext | null>(null);  // reproducción 24kHz
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const nextPlayTimeRef = useRef<number>(0);
+  const transcriptBufferRef = useRef<string>("");
+  const onRecommendationRef = useRef(onRecommendation);
+  onRecommendationRef.current = onRecommendation;
 
-  // ── Funciones internas (sin useCallback - se usan via ref) ────────────────
-
-  const stopAudioPlaybackInternal = () => {
-    activeSourcesRef.current.forEach((s) => {
-      try { s.stop(); } catch (_e) { /* ya detenido */ }
-    });
-    activeSourcesRef.current = [];
-    if (playAudioContextRef.current) {
-      nextPlayTimeRef.current = playAudioContextRef.current.currentTime;
-    }
-  };
-
-  const cleanupInternal = () => {
-    // Cerrar sesión de Gemini
-    if (sessionRef.current) {
-      sessionRef.current.then((session: any) => {
-        try { session.close(); } catch (_e) { /* ignorar */ }
-      });
-      sessionRef.current = null;
-    }
-    // Apagar micrófono
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-    // Cerrar contexto de grabación
-    if (audioContextRef.current) {
-      audioContextRef.current.close().catch(() => { });
-      audioContextRef.current = null;
-    }
-    // Detener reproducción
-    stopAudioPlaybackInternal();
-    // Cerrar contexto de reproducción
-    if (playAudioContextRef.current) {
-      playAudioContextRef.current.close().catch(() => { });
-      playAudioContextRef.current = null;
-    }
-  };
-
-  // Guardar cleanup en ref para que el useEffect siempre tenga la versión actual
-  const cleanupRef = useRef(cleanupInternal);
-  cleanupRef.current = cleanupInternal;
-
-  // ── Reproducir chunk PCM base64 a 24kHz ───────────────────────────────────
+  // ── Reproducción de audio PCM base64 (24kHz) ─────────────────────────────
   const playBase64Pcm = useCallback((base64: string) => {
     if (!playAudioContextRef.current) return;
     const ctx = playAudioContextRef.current;
@@ -135,9 +94,7 @@ export function useVoiceAgent({
     const binaryString = window.atob(base64);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
+    for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
 
     const int16Array = new Int16Array(bytes.buffer);
     const float32Array = new Float32Array(int16Array.length);
@@ -153,9 +110,7 @@ export function useVoiceAgent({
     source.connect(ctx.destination);
 
     const currentTime = ctx.currentTime;
-    if (nextPlayTimeRef.current < currentTime) {
-      nextPlayTimeRef.current = currentTime;
-    }
+    if (nextPlayTimeRef.current < currentTime) nextPlayTimeRef.current = currentTime;
     source.start(nextPlayTimeRef.current);
     nextPlayTimeRef.current += buffer.duration;
 
@@ -163,156 +118,63 @@ export function useVoiceAgent({
     setIsSpeaking(true);
 
     source.onended = () => {
-      activeSourcesRef.current = activeSourcesRef.current.filter(
-        (s) => s !== source
-      );
-      if (activeSourcesRef.current.length === 0) {
-        setIsSpeaking(false);
-      }
+      activeSourcesRef.current = activeSourcesRef.current.filter((s) => s !== source);
+      if (activeSourcesRef.current.length === 0) setIsSpeaking(false);
     };
   }, []);
 
-  // ── Finalizar sesión (estable — sin deps que cambien) ─────────────────────
+  // ── Detener reproducción (interrupciones) ────────────────────────────────
+  const stopAudioPlayback = useCallback(() => {
+    activeSourcesRef.current.forEach((s) => { try { s.stop(); } catch (_e) {} });
+    activeSourcesRef.current = [];
+    if (playAudioContextRef.current) {
+      nextPlayTimeRef.current = playAudioContextRef.current.currentTime;
+    }
+    setIsSpeaking(false);
+  }, []);
+
+  // ── Limpieza completa ────────────────────────────────────────────────────
+  const cleanup = useCallback(() => {
+    if (sessionRef.current) {
+      sessionRef.current.then((s: any) => { try { s.close(); } catch (_e) {} });
+      sessionRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
+    stopAudioPlayback();
+    if (playAudioContextRef.current) {
+      playAudioContextRef.current.close().catch(() => {});
+      playAudioContextRef.current = null;
+    }
+  }, [stopAudioPlayback]);
+
+  // ── Finalizar sesión ─────────────────────────────────────────────────────
   const endSession = useCallback(() => {
-    cleanupRef.current();
+    cleanup();
     setIsConnected(false);
     setIsConnecting(false);
-    setIsSpeaking(false);
-  }, []); // ← vacío: cleanupRef.current siempre tiene la versión actualizada
+  }, [cleanup]);
 
-  // ── Iniciar sesión Live ───────────────────────────────────────────────────
+  // ── Iniciar sesión Live ──────────────────────────────────────────────────
   const startSession = useCallback(async () => {
     setIsConnecting(true);
     setError(null);
+    transcriptBufferRef.current = "";
 
     try {
-      // 1. Setup Audio Playback Context (24kHz — lo que devuelve Gemini)
+      // 1. Contexto de reproducción a 24kHz
       playAudioContextRef.current = new AudioContext({ sampleRate: 24000 });
       nextPlayTimeRef.current = playAudioContextRef.current.currentTime;
 
-      // 2. Setup Audio Capture Context (16kHz — lo que espera Gemini)
-      audioContextRef.current = new AudioContext({ sampleRate: 16000 });
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-
-      // AudioWorklet para convertir el mic a PCM16
-      const workletCode = `
-        class AudioRecorder extends AudioWorkletProcessor {
-          process(inputs, outputs, parameters) {
-            const input = inputs[0];
-            if (input && input.length > 0) {
-              const channelData = input[0];
-              const pcm16 = new Int16Array(channelData.length);
-              for (let i = 0; i < channelData.length; i++) {
-                let s = Math.max(-1, Math.min(1, channelData[i]));
-                pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-              }
-              this.port.postMessage(pcm16);
-            }
-            return true;
-          }
-        }
-        registerProcessor('audio-recorder', AudioRecorder);
-      `;
-      const blob = new Blob([workletCode], { type: "application/javascript" });
-      const workletUrl = URL.createObjectURL(blob);
-      await audioContextRef.current.audioWorklet.addModule(workletUrl);
-
-      const recorderNode = new AudioWorkletNode(
-        audioContextRef.current,
-        "audio-recorder"
-      );
-
-      // 3. Conectar a Gemini Live API
+      // 2. Conectar a Gemini Live
       const sessionPromise = ai.live.connect({
         model: "gemini-3.1-flash-live-preview",
-        callbacks: {
-          onopen: () => {
-            setIsConnecting(false);
-            setIsConnected(true);
-
-            // Pedirle a Gemini que inicie la conversación sin que el usuario tenga que hablar primero
-            sessionPromise.then(session => {
-              try {
-                session.sendClientContent({
-                  turns: [{ role: "user", parts: [{ text: "Hola, acabo de entrar a la llamada. Por favor salúdame por mi nombre y empieza la entrevista según tus instrucciones." }] }],
-                  turnComplete: true,
-                });
-              } catch (_e) {
-                // Algunas versiones del SDK no soportan el saludo inicial — el usuario puede hablar primero
-                console.warn("sendClientContent not available on this SDK version");
-              }
-            });
-
-            // Configurar envío de audio del mic → Gemini
-            recorderNode.port.onmessage = (e) => {
-              const pcm16 = e.data;
-              const buffer = new ArrayBuffer(pcm16.length * 2);
-              const view = new DataView(buffer);
-              for (let i = 0; i < pcm16.length; i++) {
-                view.setInt16(i * 2, pcm16[i], true);
-              }
-              let binary = "";
-              const bytes = new Uint8Array(buffer);
-              for (let i = 0; i < bytes.byteLength; i++) {
-                binary += String.fromCharCode(bytes[i]);
-              }
-              const base64 = window.btoa(binary);
-
-              sessionPromise.then((session) => {
-                session.sendRealtimeInput({
-                  audio: {
-                    data: base64,
-                    mimeType: "audio/pcm;rate=16000",
-                  },
-                });
-              });
-            };
-
-            source.connect(recorderNode);
-            recorderNode.connect(audioContextRef.current!.destination);
-          },
-          onmessage: (message: LiveServerMessage) => {
-            if (message.serverContent?.interrupted) {
-              stopAudioPlaybackInternal();
-              setIsSpeaking(false);
-            }
-            const parts = message.serverContent?.modelTurn?.parts || [];
-            for (const part of parts) {
-              if (part.inlineData?.data) {
-                playBase64Pcm(part.inlineData.data);
-              }
-              // Detect PORTFOLIO tag in text transcripts
-              if (part.text) {
-                transcriptBufferRef.current += part.text;
-                const match = transcriptBufferRef.current.match(/PORTFOLIO:(\{.*?\})/);
-                if (match) {
-                  try {
-                    const rec: PortfolioRecommendation = JSON.parse(match[1]);
-                    onRecommendationRef.current?.(rec);
-                    transcriptBufferRef.current = "";
-                  } catch { /* ignore parse errors */ }
-                }
-              }
-            }
-          },
-          onerror: (err) => {
-            console.error("Gemini Live Error:", err);
-            setError("Error de conexión. Intenta de nuevo.");
-            cleanupRef.current();
-            setIsConnected(false);
-            setIsConnecting(false);
-            setIsSpeaking(false);
-          },
-          onclose: () => {
-            console.log("Sesión Gemini cerrada");
-            cleanupRef.current();
-            setIsConnected(false);
-            setIsConnecting(false);
-            setIsSpeaking(false);
-          },
-        },
         config: {
           responseModalities: [Modality.AUDIO],
           speechConfig: {
@@ -322,31 +184,148 @@ export function useVoiceAgent({
           },
           systemInstruction: buildSystemInstruction(financialContext, intakeData),
         },
+        callbacks: {
+          onopen: async () => {
+            setIsConnecting(false);
+            setIsConnected(true);
+
+            // 3. Configurar micrófono DENTRO de onopen (patrón correcto)
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              streamRef.current = stream;
+
+              audioContextRef.current = new AudioContext({ sampleRate: 16000 });
+              const source = audioContextRef.current.createMediaStreamSource(stream);
+
+              // AudioWorklet: mic → PCM16
+              const workletCode = `
+                class AudioRecorder extends AudioWorkletProcessor {
+                  process(inputs) {
+                    const input = inputs[0];
+                    if (input && input.length > 0) {
+                      const channelData = input[0];
+                      const pcm16 = new Int16Array(channelData.length);
+                      for (let i = 0; i < channelData.length; i++) {
+                        let s = Math.max(-1, Math.min(1, channelData[i]));
+                        pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                      }
+                      this.port.postMessage(pcm16);
+                    }
+                    return true;
+                  }
+                }
+                registerProcessor('audio-recorder', AudioRecorder);
+              `;
+              const blob = new Blob([workletCode], { type: "application/javascript" });
+              await audioContextRef.current.audioWorklet.addModule(URL.createObjectURL(blob));
+
+              const recorderNode = new AudioWorkletNode(audioContextRef.current, "audio-recorder");
+
+              // 4. Enviar chunks de audio a Gemini
+              recorderNode.port.onmessage = (e) => {
+                const pcm16 = e.data;
+                const buffer = new ArrayBuffer(pcm16.length * 2);
+                const view = new DataView(buffer);
+                for (let i = 0; i < pcm16.length; i++) view.setInt16(i * 2, pcm16[i], true);
+
+                let binary = "";
+                const bytes = new Uint8Array(buffer);
+                for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                const base64 = window.btoa(binary);
+
+                // sessionPromise ya está resuelta aquí — .then() es síncrono
+                sessionPromise.then((session) => {
+                  try {
+                    session.sendRealtimeInput({
+                      audio: { data: base64, mimeType: "audio/pcm;rate=16000" },
+                    });
+                  } catch (_e) { /* WS cerrado, ignorar */ }
+                });
+              };
+
+              source.connect(recorderNode);
+
+              // Señalar al modelo que es su turno para que inicie la bienvenida
+              sessionPromise.then((session) => {
+                try {
+                  session.sendClientContent({ turnComplete: true });
+                } catch (_e) {}
+              });
+            } catch (micErr) {
+              setError("No se pudo acceder al micrófono.");
+              cleanup();
+              setIsConnected(false);
+            }
+          },
+
+          onmessage: (message: LiveServerMessage) => {
+            console.log("[Gemini] message:", JSON.stringify(message).slice(0, 200));
+
+            // Setup completo — el servidor está listo
+            if (message.setupComplete) {
+              console.log("[Gemini] setup completo ✓");
+            }
+
+            // Manejar interrupciones
+            if (message.serverContent?.interrupted) {
+              stopAudioPlayback();
+            }
+
+            // Reproducir audio de respuesta
+            const parts = message.serverContent?.modelTurn?.parts || [];
+            for (const part of parts) {
+              if (part.inlineData?.data) {
+                playBase64Pcm(part.inlineData.data);
+              }
+              // Detectar etiqueta PORTFOLIO en la transcripción de texto
+              if (part.text) {
+                transcriptBufferRef.current += part.text;
+                const match = transcriptBufferRef.current.match(/PORTFOLIO:(\{[\s\S]*?\})/);
+                if (match) {
+                  try {
+                    const rec: PortfolioRecommendation = JSON.parse(match[1]);
+                    onRecommendationRef.current?.(rec);
+                    transcriptBufferRef.current = "";
+                  } catch { /* ignorar errores de parse */ }
+                }
+              }
+            }
+          },
+
+          onerror: (err) => {
+            console.error("Gemini Live error:", err);
+            setError("Error de conexión. Intenta de nuevo.");
+            cleanup();
+            setIsConnected(false);
+            setIsConnecting(false);
+          },
+
+          onclose: (event: any) => {
+            console.warn("Sesión Gemini cerrada:", event?.code, event?.reason);
+            cleanup();
+            if (event?.code && event.code !== 1000) {
+              setError(`Conexión cerrada (${event.code}): ${event.reason || "sin razón"}`);
+            }
+            setIsConnected(false);
+            setIsConnecting(false);
+          },
+        },
       });
 
       sessionRef.current = sessionPromise;
+
     } catch (err) {
-      console.error("Failed to start call:", err);
-      setError("No se pudo acceder al micrófono o conectar con la IA.");
-      cleanupRef.current();
+      console.error("Error al iniciar sesión:", err);
+      setError("No se pudo conectar con la IA.");
+      cleanup();
       setIsConnecting(false);
-      setIsConnected(false);
     }
-  }, [voiceName, financialContext, intakeData, playBase64Pcm]);
+  }, [voiceName, financialContext, intakeData, playBase64Pcm, stopAudioPlayback, cleanup]);
 
-  // Cleanup al desmontar — deps vacío, usa ref
+  // Cleanup al desmontar
   useEffect(() => {
-    return () => {
-      cleanupRef.current();
-    };
-  }, []);
+    return () => { cleanup(); };
+  }, [cleanup]);
 
-  return {
-    startSession,
-    endSession,
-    isConnected,
-    isConnecting,
-    isSpeaking,
-    error,
-  };
+  return { startSession, endSession, isConnected, isConnecting, isSpeaking, error };
 }

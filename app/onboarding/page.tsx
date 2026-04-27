@@ -15,10 +15,10 @@ export type IntakeData = {
 };
 
 const STEPS = [
-  { id: 1, label: "Datos básicos" },
-  { id: 2, label: "Entrevista" },
-  { id: 3, label: "Documentos" },
-  { id: 4, label: "Portafolio" },
+  { id: 1, label: "Datos básicos", desc: "Tu información" },
+  { id: 2, label: "Entrevista", desc: "Perfil de riesgo" },
+  { id: 3, label: "Documentos", desc: "KYC & SARLAFT" },
+  { id: 4, label: "Portafolio", desc: "Tu recomendación" },
 ];
 
 export default function OnboardingPage() {
@@ -31,48 +31,57 @@ export default function OnboardingPage() {
   const back = () => setStep((s) => Math.max(s - 1, 1));
 
   return (
-    <div className="min-h-screen bg-[#FAFAFA]">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/80 backdrop-blur-xl">
-        <div className="max-w-2xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-              Elemento Alpha
-            </p>
-            <h1 className="text-base font-semibold text-[#1a1a1a] leading-tight">
-              Vinculación de Cliente
-            </h1>
-          </div>
-          <div className="flex items-center gap-1.5">
-            {STEPS.map((s) => (
-              <div key={s.id} className="flex items-center gap-1.5">
-                <div
-                  className={`flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold transition-all duration-300 ${
-                    s.id < step
-                      ? "bg-[#BBE795] text-[#1a1a1a]"
-                      : s.id === step
-                      ? "bg-[#1a1a1a] text-white"
-                      : "bg-gray-100 text-gray-400"
-                  }`}
-                >
-                  {s.id < step ? "✓" : s.id}
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Top bar */}
+      <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 backdrop-blur-xl">
+        <div className="max-w-3xl mx-auto px-8 py-4 flex items-center justify-between">
+          {/* Spacer left */}
+          <div />
+
+          {/* Step tracker */}
+          <nav className="hidden sm:flex items-center gap-1">
+            {STEPS.map((s, i) => (
+              <div key={s.id} className="flex items-center">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg">
+                  <div
+                    className={`flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold transition-all duration-300 ${
+                      s.id < step
+                        ? "bg-[#BBE795] text-[#1a1a1a]"
+                        : s.id === step
+                        ? "bg-[#4a7c59] text-white"
+                        : "bg-gray-100 text-gray-400"
+                    }`}
+                  >
+                    {s.id < step ? "✓" : s.id}
+                  </div>
+                  <span
+                    className={`text-xs font-medium transition-colors duration-300 ${
+                      s.id === step ? "text-[#1a1a1a]" : "text-gray-400"
+                    }`}
+                  >
+                    {s.label}
+                  </span>
                 </div>
-                {s.id < STEPS.length && (
-                  <div className={`w-8 h-0.5 rounded-full transition-all duration-500 ${s.id < step ? "bg-[#BBE795]" : "bg-gray-200"}`} />
+                {i < STEPS.length - 1 && (
+                  <div
+                    className={`w-6 h-px mx-1 transition-colors duration-500 ${
+                      s.id < step ? "bg-[#BBE795]" : "bg-gray-200"
+                    }`}
+                  />
                 )}
               </div>
             ))}
-          </div>
-        </div>
-        {/* Step label */}
-        <div className="max-w-2xl mx-auto px-6 pb-3">
-          <p className="text-xs text-gray-500">
-            Paso {step} de {STEPS.length} — <span className="font-semibold text-[#1a1a1a]">{STEPS[step - 1].label}</span>
-          </p>
+          </nav>
+
+          {/* Mobile step counter */}
+          <span className="sm:hidden text-xs text-gray-400 font-medium">
+            {step} / {STEPS.length}
+          </span>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-6 py-8">
+      {/* Main content */}
+      <main className="flex-1 max-w-3xl w-full mx-auto px-8 py-10">
         {step === 1 && (
           <IntakeStep
             data={intake}
@@ -99,10 +108,27 @@ export default function OnboardingPage() {
           <PortfolioStep
             intake={intake}
             recommendation={recommendation}
-            onRestart={() => { setStep(1); setIntake({ nombre: "", empresa: "", sector: "" }); setRecommendation(null); }}
+            onRestart={() => {
+              setStep(1);
+              setIntake({ nombre: "", empresa: "", sector: "" });
+              setRecommendation(null);
+            }}
           />
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-100 py-4">
+        <div className="max-w-3xl mx-auto px-8 flex items-center justify-between">
+          <p className="text-xs text-gray-400">
+            Proceso seguro · Cifrado extremo a extremo
+          </p>
+          <p className="text-xs text-gray-400">
+            Paso <span className="font-semibold text-[#1a1a1a]">{step}</span> de {STEPS.length} —{" "}
+            <span className="text-[#1a1a1a] font-medium">{STEPS[step - 1].desc}</span>
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
