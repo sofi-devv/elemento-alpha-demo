@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   ArrowLeft,
   Upload,
@@ -22,6 +23,8 @@ import {
   ShieldCheck,
   ScanLine,
   Database,
+  Edit3,
+  Save,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -212,13 +215,312 @@ const SARLAFT_RULES = [
   { label: "Análisis de riesgo ML/FT", db: "Motor IA" },
 ];
 
+// ── Campos del formulario SARLAFT ────────────────────────────────────────────
+interface SarlaftField {
+  id: string;
+  label: string;
+  section: string;
+  type: "text" | "number" | "select" | "date";
+  options?: string[];
+  required: boolean;
+  extractedValue?: string;
+  confidence?: "high" | "medium" | "low" | "none";
+}
+
+const SARLAFT_FIELDS: SarlaftField[] = [
+  // Información General
+  { id: "razon_social", label: "Razón Social", section: "general", type: "text", required: true, extractedValue: "Elemento Alpha S.A.S.", confidence: "high" },
+  { id: "nit", label: "NIT", section: "general", type: "text", required: true, extractedValue: "901.456.789-1", confidence: "high" },
+  { id: "fecha_constitucion", label: "Fecha de Constitución", section: "general", type: "date", required: true, extractedValue: "2021-03-15", confidence: "high" },
+  { id: "direccion", label: "Dirección Principal", section: "general", type: "text", required: true, extractedValue: "Cra 15 # 93-75 Of. 501", confidence: "medium" },
+  { id: "ciudad", label: "Ciudad", section: "general", type: "text", required: true, extractedValue: "Bogotá D.C.", confidence: "high" },
+  { id: "telefono", label: "Teléfono", section: "general", type: "text", required: true, extractedValue: "", confidence: "none" },
+  { id: "correo", label: "Correo Electrónico", section: "general", type: "text", required: true, extractedValue: "", confidence: "none" },
+  { id: "actividad_economica", label: "Actividad Económica (CIIU)", section: "general", type: "text", required: true, extractedValue: "6201 - Actividades de desarrollo de sistemas informáticos", confidence: "high" },
+  
+  // Representante Legal
+  { id: "rep_nombre", label: "Nombre Completo", section: "representante", type: "text", required: true, extractedValue: "Juan Carlos Mendoza Ríos", confidence: "high" },
+  { id: "rep_tipo_doc", label: "Tipo de Documento", section: "representante", type: "select", options: ["Cédula de Ciudadanía", "Cédula de Extranjería", "Pasaporte"], required: true, extractedValue: "Cédula de Ciudadanía", confidence: "high" },
+  { id: "rep_numero_doc", label: "Número de Documento", section: "representante", type: "text", required: true, extractedValue: "80.123.456", confidence: "high" },
+  { id: "rep_fecha_expedicion", label: "Fecha de Expedición", section: "representante", type: "date", required: true, extractedValue: "", confidence: "none" },
+  { id: "rep_lugar_expedicion", label: "Lugar de Expedición", section: "representante", type: "text", required: true, extractedValue: "", confidence: "none" },
+  { id: "rep_cargo", label: "Cargo", section: "representante", type: "text", required: true, extractedValue: "Gerente General", confidence: "high" },
+  
+  // Información Financiera
+  { id: "ingresos_mensuales", label: "Ingresos Mensuales (COP)", section: "financiera", type: "number", required: true, extractedValue: "450000000", confidence: "medium" },
+  { id: "egresos_mensuales", label: "Egresos Mensuales (COP)", section: "financiera", type: "number", required: true, extractedValue: "320000000", confidence: "medium" },
+  { id: "activos_totales", label: "Total Activos (COP)", section: "financiera", type: "number", required: true, extractedValue: "2850000000", confidence: "high" },
+  { id: "pasivos_totales", label: "Total Pasivos (COP)", section: "financiera", type: "number", required: true, extractedValue: "980000000", confidence: "high" },
+  { id: "patrimonio", label: "Patrimonio (COP)", section: "financiera", type: "number", required: true, extractedValue: "1870000000", confidence: "high" },
+  { id: "origen_fondos", label: "Origen de los Fondos", section: "financiera", type: "text", required: true, extractedValue: "", confidence: "none" },
+  
+  // Beneficiarios Finales
+  { id: "bf1_nombre", label: "Beneficiario Final 1 - Nombre", section: "beneficiarios", type: "text", required: true, extractedValue: "María Elena Gómez", confidence: "high" },
+  { id: "bf1_documento", label: "Beneficiario Final 1 - Documento", section: "beneficiarios", type: "text", required: true, extractedValue: "52.987.654", confidence: "high" },
+  { id: "bf1_participacion", label: "Beneficiario Final 1 - % Participación", section: "beneficiarios", type: "number", required: true, extractedValue: "60", confidence: "high" },
+  { id: "bf2_nombre", label: "Beneficiario Final 2 - Nombre", section: "beneficiarios", type: "text", required: false, extractedValue: "Pedro Luis Martínez", confidence: "medium" },
+  { id: "bf2_documento", label: "Beneficiario Final 2 - Documento", section: "beneficiarios", type: "text", required: false, extractedValue: "", confidence: "none" },
+  { id: "bf2_participacion", label: "Beneficiario Final 2 - % Participación", section: "beneficiarios", type: "number", required: false, extractedValue: "40", confidence: "medium" },
+  
+  // PEPs
+  { id: "es_pep", label: "¿Es PEP o tiene vínculo con PEP?", section: "peps", type: "select", options: ["No", "Sí"], required: true, extractedValue: "No", confidence: "high" },
+  { id: "pep_cargo", label: "Cargo Público (si aplica)", section: "peps", type: "text", required: false, extractedValue: "", confidence: "none" },
+  { id: "pep_entidad", label: "Entidad Pública (si aplica)", section: "peps", type: "text", required: false, extractedValue: "", confidence: "none" },
+  
+  // Operaciones Internacionales
+  { id: "op_internacionales", label: "¿Realiza operaciones internacionales?", section: "operaciones", type: "select", options: ["No", "Sí"], required: true, extractedValue: "", confidence: "none" },
+  { id: "paises_operacion", label: "Países con los que opera", section: "operaciones", type: "text", required: false, extractedValue: "", confidence: "none" },
+  { id: "moneda_extranjera", label: "¿Maneja moneda extranjera?", section: "operaciones", type: "select", options: ["No", "Sí"], required: true, extractedValue: "", confidence: "none" },
+];
+
+const SECTIONS = [
+  { id: "general", title: "Información General de la Empresa", icon: Building2 },
+  { id: "representante", title: "Representante Legal", icon: CreditCard },
+  { id: "financiera", title: "Información Financiera", icon: BarChart2 },
+  { id: "beneficiarios", title: "Beneficiarios Finales", icon: Users },
+  { id: "peps", title: "Personas Expuestas Políticamente (PEPs)", icon: ShieldCheck },
+  { id: "operaciones", title: "Operaciones Internacionales", icon: Landmark },
+];
+
 function getRulesForDoc(docIdx: number) {
   const start = (docIdx * 3) % SARLAFT_RULES.length;
   return [0, 1, 2].map((i) => SARLAFT_RULES[(start + i) % SARLAFT_RULES.length]);
 }
 
+// ── Formulario SARLAFT ───────────────────────────────────────────────────────
+function SarlaftForm({ onComplete }: { onComplete: () => void }) {
+  const [formData, setFormData] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    SARLAFT_FIELDS.forEach((f) => {
+      initial[f.id] = f.extractedValue || "";
+    });
+    return initial;
+  });
+  const [currentSection, setCurrentSection] = useState(0);
+  const [editingField, setEditingField] = useState<string | null>(null);
+
+  const handleChange = (id: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const sectionFields = SARLAFT_FIELDS.filter(
+    (f) => f.section === SECTIONS[currentSection].id
+  );
+
+  const filledInSection = sectionFields.filter((f) => formData[f.id]?.trim()).length;
+  const requiredInSection = sectionFields.filter((f) => f.required).length;
+  const requiredFilledInSection = sectionFields.filter((f) => f.required && formData[f.id]?.trim()).length;
+  const canAdvance = requiredFilledInSection === requiredInSection;
+
+  const totalRequired = SARLAFT_FIELDS.filter((f) => f.required).length;
+  const totalRequiredFilled = SARLAFT_FIELDS.filter((f) => f.required && formData[f.id]?.trim()).length;
+  const overallProgress = Math.round((totalRequiredFilled / totalRequired) * 100);
+
+  const SectionIcon = SECTIONS[currentSection].icon;
+
+  const getConfidenceBadge = (confidence?: "high" | "medium" | "low" | "none") => {
+    if (!confidence || confidence === "none") return null;
+    const configs = {
+      high: { label: "Auto-detectado", color: "bg-[#BBE795] text-[#1a1a1a]" },
+      medium: { label: "Verificar", color: "bg-amber-100 text-amber-700" },
+      low: { label: "Revisar", color: "bg-orange-100 text-orange-700" },
+    };
+    const config = configs[confidence];
+    return (
+      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${config.color}`}>
+        {config.label}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Header del formulario */}
+      <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-6">
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-12 h-12 rounded-xl bg-[#BBE795] flex items-center justify-center">
+            <ShieldCheck className="w-6 h-6 text-[#1a1a1a]" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-[#1a1a1a]">Formulario SARLAFT</h2>
+            <p className="text-sm text-gray-500">Complete los campos faltantes para finalizar</p>
+          </div>
+        </div>
+        
+        {/* Barra de progreso general */}
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-gray-500">Progreso total</span>
+          <span className="text-xs font-bold text-[#6abf1a]">{overallProgress}%</span>
+        </div>
+        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500 bg-gradient-to-r from-[#BBE795] to-[#7dd83a]"
+            style={{ width: `${overallProgress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Navegación de secciones */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {SECTIONS.map((section, idx) => {
+          const sectionFieldsList = SARLAFT_FIELDS.filter((f) => f.section === section.id);
+          const sectionRequiredFilled = sectionFieldsList.filter((f) => f.required && formData[f.id]?.trim()).length;
+          const sectionRequiredTotal = sectionFieldsList.filter((f) => f.required).length;
+          const isComplete = sectionRequiredFilled === sectionRequiredTotal;
+          const Icon = section.icon;
+          
+          return (
+            <button
+              key={section.id}
+              onClick={() => setCurrentSection(idx)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                idx === currentSection
+                  ? "bg-[#1a1a1a] text-white shadow-lg"
+                  : isComplete
+                  ? "bg-[#F0FEE6] text-[#6abf1a] ring-1 ring-[#BBE795]/40"
+                  : "bg-white text-gray-500 ring-1 ring-gray-100 hover:ring-gray-200"
+              }`}
+            >
+              {isComplete ? (
+                <CheckCircle2 className="w-4 h-4" />
+              ) : (
+                <Icon className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">{section.title.split(" ")[0]}</span>
+              <span className="sm:hidden">{idx + 1}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Sección actual */}
+      <div className="bg-white rounded-2xl ring-1 ring-gray-100 overflow-hidden">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center">
+              <SectionIcon className="w-5 h-5 text-gray-400" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-[#1a1a1a]">{SECTIONS[currentSection].title}</h3>
+              <p className="text-xs text-gray-400">{filledInSection} de {sectionFields.length} campos completados</p>
+            </div>
+          </div>
+          {canAdvance && (
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[#6abf1a] bg-[#F0FEE6] px-3 py-1.5 rounded-full">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              Completo
+            </div>
+          )}
+        </div>
+
+        {/* Campos del formulario */}
+        <div className="p-5 space-y-4">
+          {sectionFields.map((field) => {
+            const originalField = SARLAFT_FIELDS.find((f) => f.id === field.id);
+            const hasExtractedValue = originalField?.extractedValue && originalField.extractedValue.trim();
+            const isEditing = editingField === field.id;
+            const isEmpty = !formData[field.id]?.trim();
+            
+            return (
+              <div key={field.id} className="group">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-medium text-gray-700">
+                    {field.label}
+                    {field.required && <span className="text-red-400 ml-1">*</span>}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    {hasExtractedValue && getConfidenceBadge(originalField?.confidence)}
+                    {hasExtractedValue && !isEditing && (
+                      <button
+                        onClick={() => setEditingField(field.id)}
+                        className="text-gray-400 hover:text-[#6abf1a] transition-colors"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                {field.type === "select" ? (
+                  <select
+                    value={formData[field.id]}
+                    onChange={(e) => handleChange(field.id, e.target.value)}
+                    className={`w-full px-4 py-3 rounded-xl text-sm transition-all duration-200 outline-none ${
+                      isEmpty
+                        ? "bg-amber-50 ring-2 ring-amber-200 focus:ring-[#BBE795]"
+                        : "bg-gray-50 ring-1 ring-gray-200 focus:ring-2 focus:ring-[#BBE795]"
+                    }`}
+                  >
+                    <option value="">Seleccionar...</option>
+                    {field.options?.map((opt) => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    type={field.type === "number" ? "text" : field.type}
+                    value={formData[field.id]}
+                    onChange={(e) => handleChange(field.id, e.target.value)}
+                    placeholder={isEmpty ? "Completar este campo..." : ""}
+                    className={`w-full px-4 py-3 h-auto rounded-xl text-sm transition-all duration-200 ${
+                      isEmpty
+                        ? "bg-amber-50 ring-2 ring-amber-200 focus:ring-[#BBE795] placeholder:text-amber-400"
+                        : "bg-gray-50 ring-1 ring-gray-200 focus:ring-2 focus:ring-[#BBE795]"
+                    }`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Navegación y acciones */}
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          onClick={() => setCurrentSection((s) => Math.max(0, s - 1))}
+          disabled={currentSection === 0}
+          className="text-sm font-medium"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Anterior
+        </Button>
+        
+        {currentSection < SECTIONS.length - 1 ? (
+          <Button
+            onClick={() => setCurrentSection((s) => s + 1)}
+            disabled={!canAdvance}
+            className={`text-sm font-semibold transition-all duration-200 ${
+              canAdvance
+                ? "bg-[#1a1a1a] text-white hover:bg-black"
+                : "bg-gray-100 text-gray-400"
+            }`}
+          >
+            Siguiente sección
+            <ChevronRight className="w-4 h-4 ml-2" />
+          </Button>
+        ) : (
+          <Button
+            onClick={onComplete}
+            disabled={overallProgress < 100}
+            className={`text-sm font-semibold transition-all duration-300 ${
+              overallProgress === 100
+                ? "bg-[#BBE795] text-[#1a1a1a] hover:bg-[#8fd94a] shadow-[0_4px_16px_rgba(187,231,149,0.35)]"
+                : "bg-gray-100 text-gray-400"
+            }`}
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Finalizar vinculación
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Pantalla de verificación animada ─────────────────────────────────────────
-function VerificationScreen({ docs }: { docs: Document[] }) {
+function VerificationScreen({ docs, onAnalysisComplete }: { docs: Document[]; onAnalysisComplete: () => void }) {
   const [currentDocIdx, setCurrentDocIdx] = useState(0);
   const [phase, setPhase] = useState<"scanning" | "checking" | "approved">("scanning");
   const [rulesVisible, setRulesVisible] = useState(0);
@@ -268,6 +570,14 @@ function VerificationScreen({ docs }: { docs: Document[] }) {
     }
   }, [phase, rulesVisible, currentDocIdx, docs.length, allDone]);
 
+  // Cuando termina, mostrar el formulario después de un delay
+  useEffect(() => {
+    if (allDone) {
+      const t = setTimeout(() => onAnalysisComplete(), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [allDone, onAnalysisComplete]);
+
   const currentDoc = docs[currentDocIdx];
   const CurrentIcon = currentDoc?.icon ?? FileText;
   const rules = getRulesForDoc(currentDocIdx);
@@ -278,26 +588,14 @@ function VerificationScreen({ docs }: { docs: Document[] }) {
         <div className="w-20 h-20 rounded-full bg-[#BBE795] flex items-center justify-center mx-auto mb-5 shadow-[0_0_40px_rgba(187,231,149,0.5)]">
           <ShieldCheck className="w-10 h-10 text-[#1a1a1a]" />
         </div>
-        <h2 className="text-2xl font-bold text-[#1a1a1a] mb-2">Validación SARLAFT completada</h2>
-        <p className="text-sm text-gray-500 max-w-md mx-auto leading-relaxed mb-2">
-          Los <strong>{docs.length} documentos</strong> fueron validados contra las listas restrictivas internacionales y la normativa colombiana de prevención de lavado de activos.
+        <h2 className="text-2xl font-bold text-[#1a1a1a] mb-2">Análisis completado</h2>
+        <p className="text-sm text-gray-500 max-w-md mx-auto leading-relaxed mb-4">
+          Los documentos fueron analizados correctamente. Ahora complete los campos faltantes del formulario SARLAFT.
         </p>
-        <p className="text-xs text-gray-400 max-w-md mx-auto leading-relaxed mb-8">
-          Esta validación emplea procesamiento NLP con revisión <em>Human-in-the-Loop</em> para garantizar cumplimiento regulatorio.
-        </p>
-        <div className="grid grid-cols-2 gap-2 mb-8 max-w-sm mx-auto">
-          {SARLAFT_RULES.slice(0, 6).map((r) => (
-            <div key={r.label} className="flex items-center gap-2 text-xs text-left bg-[#F0FEE6] rounded-lg px-3 py-2 ring-1 ring-[#BBE795]/30">
-              <CheckCircle2 className="w-3.5 h-3.5 text-[#6abf1a] shrink-0" />
-              <span className="text-gray-600 font-medium">{r.db}</span>
-            </div>
-          ))}
+        <div className="flex items-center justify-center gap-2 text-sm text-[#6abf1a] font-medium">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Preparando formulario...
         </div>
-        <Link href="/">
-          <Button className="bg-[#1a1a1a] text-white hover:bg-black shadow-lg font-semibold">
-            Volver al panel principal
-          </Button>
-        </Link>
       </div>
     );
   }
@@ -488,17 +786,8 @@ function VerificationScreen({ docs }: { docs: Document[] }) {
 export default function SarlaftPage() {
   const [docs, setDocs] = useState<Document[]>(initialDocs);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verifiedIndex, setVerifiedIndex] = useState(-1);
-
-  // Verification animation logic
-  useEffect(() => {
-    if (isVerifying && verifiedIndex < docs.length) {
-      const timer = setTimeout(() => {
-        setVerifiedIndex((prev) => prev + 1);
-      }, 700);
-      return () => clearTimeout(timer);
-    }
-  }, [isVerifying, verifiedIndex, docs.length]);
+  const [showForm, setShowForm] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
 
   const toggleDoc = (id: string) => {
     setDocs((prev) =>
@@ -510,11 +799,27 @@ export default function SarlaftPage() {
     );
   };
 
+  const handleAnalysisComplete = () => {
+    setShowForm(true);
+  };
+
+  const handleFormComplete = () => {
+    setIsComplete(true);
+  };
+
   const uploaded = docs.filter((d) => d.status !== "pending").length;
   const total = docs.length;
   const progress = Math.round((uploaded / total) * 100);
   const allDone = uploaded === total;
-  const isFinished = verifiedIndex >= docs.length;
+
+  // Determinar fase actual
+  const getCurrentPhase = () => {
+    if (isComplete) return "complete";
+    if (showForm) return "form";
+    if (isVerifying) return "verifying";
+    return "upload";
+  };
+  const phase = getCurrentPhase();
 
   return (
     <div className="min-h-screen bg-[#FAFAFA]">
@@ -529,34 +834,42 @@ export default function SarlaftPage() {
             </Link>
             <div>
               <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
-                Onboarding · Fase 1
+                Onboarding · {phase === "upload" ? "Fase 1" : phase === "verifying" ? "Fase 2" : phase === "form" ? "Fase 3" : "Completado"}
               </p>
               <h1 className="text-base font-semibold text-[#1a1a1a] leading-tight">
                 Procedimiento SARLAFT
               </h1>
             </div>
           </div>
-          {!isVerifying ? (
+          {phase === "upload" && (
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <span className="font-semibold text-[#1a1a1a]">{uploaded}</span>
               <span>de {total} documentos</span>
             </div>
-          ) : !isFinished ? (
+          )}
+          {phase === "verifying" && (
             <div className="flex items-center gap-2 text-sm text-blue-500 font-medium">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Verificando...</span>
+              <span>Analizando...</span>
             </div>
-          ) : (
+          )}
+          {phase === "form" && (
+            <div className="flex items-center gap-2 text-sm text-amber-500 font-medium">
+              <Edit3 className="w-4 h-4" />
+              <span>Completar formulario</span>
+            </div>
+          )}
+          {phase === "complete" && (
             <div className="flex items-center gap-2 text-sm text-[#6abf1a] font-medium">
               <CheckCircle2 className="w-4 h-4" />
-              <span>Verificación completada</span>
+              <span>Vinculación completada</span>
             </div>
           )}
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8">
-        {!isVerifying ? (
+        {phase === "upload" && (
           <>
             {/* Hero */}
             <div className="mb-8">
@@ -613,11 +926,11 @@ export default function SarlaftPage() {
             <div className="flex items-center justify-between p-5 rounded-2xl bg-white ring-1 ring-gray-100">
               <div>
                 <p className="text-sm font-semibold text-[#1a1a1a]">
-                  {allDone ? "¡Listo para revisar!" : "Completa todos los documentos"}
+                  {allDone ? "¡Listo para analizar!" : "Completa todos los documentos"}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5 max-w-sm">
                   {allDone
-                    ? "Iniciará una validación automática estructurada con IA."
+                    ? "Analizaremos los documentos y pre-llenaremos el formulario SARLAFT."
                     : `Faltan ${total - uploaded} de ${total} documentos para continuar.`}
                 </p>
               </div>
@@ -630,13 +943,47 @@ export default function SarlaftPage() {
                     : "bg-gray-100 text-gray-400 cursor-not-allowed"
                 }`}
               >
-                Iniciar verificación estructurada
+                Iniciar análisis
                 <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </>
-        ) : (
-          <VerificationScreen docs={docs} />
+        )}
+        
+        {phase === "verifying" && (
+          <VerificationScreen docs={docs} onAnalysisComplete={handleAnalysisComplete} />
+        )}
+        
+        {phase === "form" && (
+          <SarlaftForm onComplete={handleFormComplete} />
+        )}
+        
+        {phase === "complete" && (
+          <div className="bg-white rounded-2xl ring-1 ring-gray-100 p-10 text-center animate-in fade-in duration-700">
+            <div className="w-20 h-20 rounded-full bg-[#BBE795] flex items-center justify-center mx-auto mb-5 shadow-[0_0_40px_rgba(187,231,149,0.5)]">
+              <ShieldCheck className="w-10 h-10 text-[#1a1a1a]" />
+            </div>
+            <h2 className="text-2xl font-bold text-[#1a1a1a] mb-2">Vinculación SARLAFT Completada</h2>
+            <p className="text-sm text-gray-500 max-w-md mx-auto leading-relaxed mb-2">
+              La información ha sido validada exitosamente contra las listas restrictivas y cumple con la normativa SARLAFT.
+            </p>
+            <p className="text-xs text-gray-400 max-w-md mx-auto leading-relaxed mb-8">
+              El expediente digital ha sido generado y está listo para su revisión final.
+            </p>
+            <div className="grid grid-cols-2 gap-2 mb-8 max-w-sm mx-auto">
+              {SARLAFT_RULES.slice(0, 6).map((r) => (
+                <div key={r.label} className="flex items-center gap-2 text-xs text-left bg-[#F0FEE6] rounded-lg px-3 py-2 ring-1 ring-[#BBE795]/30">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#6abf1a] shrink-0" />
+                  <span className="text-gray-600 font-medium">{r.db}</span>
+                </div>
+              ))}
+            </div>
+            <Link href="/">
+              <Button className="bg-[#1a1a1a] text-white hover:bg-black shadow-lg font-semibold">
+                Volver al panel principal
+              </Button>
+            </Link>
+          </div>
         )}
       </main>
     </div>
