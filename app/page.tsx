@@ -9,13 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import {
   UserCheck,
-  ShieldCheck,
-  FileText,
   Briefcase,
-  BarChart3,
-  PieChart,
-  Headphones,
-  MessageSquare,
   FileBarChart,
   ChevronRight,
   CheckCircle2,
@@ -43,43 +37,35 @@ const timelineSteps: {
   {
     phase: 1,
     title: "Onboarding",
-    subtitle: "KYC & Procedimiento SARLAFT",
+    subtitle: "Entrevista · KYC · SARLAFT · Portafolio",
     status: "active" as const,
     date: "Fase 1",
     description:
-      "Proceso de vinculación del cliente incluyendo la verificación de identidad (KYC) y el cumplimiento del procedimiento SARLAFT para la prevención de lavado de activos.",
+      "Proceso de vinculación del cliente: formulario de datos básicos, entrevista de objetivos con IA de voz, carga de documentos KYC + SARLAFT, y recomendación de portafolio personalizada.",
     items: [
       {
         icon: UserCheck,
-        label: "Verificación de Identidad (KYC)",
-        description: "Validación de documentos y datos personales del cliente",
-        link: "Iniciar verificación",
-        href: "/onboarding/kyc",
-      },
-      {
-        icon: ShieldCheck,
-        label: "Procedimiento SARLAFT",
-        description:
-          "Análisis de riesgo y debida diligencia según normativa vigente",
-        link: "Ver procedimiento",
-        href: "/onboarding/sarlaft",
+        label: "Iniciar proceso de vinculación",
+        description: "Datos · Entrevista de voz · Documentos · Portafolio — todo en un solo flujo",
+        link: "Comenzar",
+        href: "/onboarding",
       },
     ],
   },
   {
     phase: 2,
     title: "Front Office",
-    subtitle: "Panel de Muestra de Portafolios",
+    subtitle: "Panel de Portafolios",
     status: "pending" as const,
     date: "Fase 2",
     description:
-      "Acceso al panel principal del front office donde el cliente puede visualizar portafolios de inversión, rendimientos y opciones disponibles.",
+      "Acceso al panel principal donde el cliente puede visualizar su portafolio asignado, rendimientos y opciones disponibles.",
     items: [
       {
         icon: Briefcase,
         label: "Portafolios de Inversión",
         description:
-          "Visualización y selección de portafolios según perfil de riesgo",
+          "Visualización y seguimiento del portafolio según perfil de riesgo",
         link: "Ver portafolios",
       },
     ],

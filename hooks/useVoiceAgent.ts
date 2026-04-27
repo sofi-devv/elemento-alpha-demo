@@ -17,50 +17,60 @@ export interface PortfolioRecommendation {
   monto?: string;
 }
 
-function buildSystemInstruction(financialContext?: string): string {
+function buildSystemInstruction(financialContext?: string, intakeData?: { nombre: string; empresa: string; sector: string }): string {
   const financialBlock = financialContext
     ? `\n\nCONTEXTO FINANCIERO DEL CLIENTE (extraído de sus estados financieros):\n---\n${financialContext}\n---\nUsa estos datos para personalizar y justificar la recomendación de portafolio.`
     : "";
 
+  const clientBlock = intakeData
+    ? `\n\nINFORMACIÓN DEL CLIENTE:\n- Nombre: ${intakeData.nombre}\n- Empresa: ${intakeData.empresa}\n- Sector: ${intakeData.sector}\nDirigete al cliente por su nombre y menciona su empresa cuando sea relevante.`
+    : "";
+
   return `Eres el asesor virtual de Elemento Alpha, plataforma colombiana de Fondos de Inversión Colectiva (FIC).
-Tu misión es realizar un perfilamiento de riesgo siguiendo el guion exacto de preguntas y al final enrutar al cliente al portafolio más adecuado.
-Habla en español colombiano. Sé conciso, empático y profesional. NUNCA hagas más de una pregunta a la vez. ESPERA la respuesta antes de continuar.${financialBlock}
+Tu misión es realizar un perfilamiento de riesgo con exactamente 5 preguntas y al final enrutar al cliente al portafolio más adecuado.
+Habla en español colombiano. Sé conciso, empático y profesional. NUNCA hagas más de una pregunta a la vez. ESPERA la respuesta antes de continuar.${clientBlock}${financialBlock}
 
 GUION (sigue este orden estrictamente, una pregunta a la vez):
 
-BIENVENIDA: "Hola, soy tu asesor de Elemento Alpha. Voy a hacerte algunas preguntas para recomendarte el portafolio ideal. ¿Listo?"
+BIENVENIDA: Saluda al cliente por su nombre, menciona su empresa y dile que le harás 5 preguntas cortas para recomendarle el portafolio ideal.
 
-P1: "¿De dónde vienen los recursos que quieres invertir y cuánto piensas invertir?"
-P2: "¿Para qué te gustaría hacer esta inversión? Por ejemplo: ahorrar, hacer crecer tu dinero, o un proyecto específico."
-P3: "¿Por cuánto tiempo planeas dejar ese dinero invertido? ¿Estamos hablando de meses, años, o no tienes prisa?"
-P4: "Si tu inversión baja un poco, ¿qué harías? ¿Retirarías el dinero, esperarías, o aprovecharías para invertir más?"
-P5: "¿Has invertido antes en fondos, acciones o cualquier instrumento financiero?"
-P6: "¿Qué tan cómodo te sientes tomando riesgos con tu dinero? ¿Bajo, medio o alto?"
-P7: "¿Este dinero que vas a invertir representa una parte importante de lo que tienes? ¿Es poco, moderado o mucho de tu patrimonio?"
-P8: "¿Tienes ingresos estables actualmente?"
-P9: "¿Hay algo importante que debamos saber sobre tu situación financiera? Por ejemplo: deudas, responsabilidades, metas próximas."
-P10: "Por último, ¿estás de acuerdo en validar tu información y cumplir con los requisitos legales de vinculación?"
+P1 — OBJETIVO: "¿Cuál es el principal objetivo de esta inversión? Por ejemplo: preservar el capital, hacer crecer el patrimonio, o financiar una meta específica."
 
-DESPUÉS de P10, di una conclusión breve en voz (2 frases máximo) y termina con EXACTAMENTE este bloque (sin formato adicional, en una sola línea):
+P2 — MONTO Y HORIZONTE: "¿Cuánto planean invertir aproximadamente, y por cuánto tiempo? ¿Estamos hablando de meses o años?"
+
+P3 — TOLERANCIA AL RIESGO: "Si la inversión bajara un 10% en un mes, ¿qué haría la empresa? ¿Retirarían el dinero, esperarían la recuperación, o aprovecharían para invertir más?"
+
+P4 — EXPERIENCIA Y LIQUIDEZ: "¿La empresa ha invertido antes en fondos u otros instrumentos? Y, ¿necesitan acceso rápido a ese dinero en algún momento?"
+
+P5 — SITUACIÓN FINANCIERA: "¿Este monto representa una parte pequeña o significativa del patrimonio de la empresa? ¿Tienen flujo de caja estable actualmente?"
+
+IMPORTANTE: El usuario puede terminar la conversación cuando quiera diciendo que ya terminó o que quiere continuar. Si el usuario indica que quiere parar, despídete amablemente, presenta tu recomendación provisional y emite el bloque PORTFOLIO.
+
+DESPUÉS de P5 (o si el usuario quiere terminar), da una conclusión breve en voz (2 frases máximo) y termina con EXACTAMENTE este bloque JSON en una sola línea sin formato adicional:
 PORTFOLIO:{"portfolio":"conservador|moderado|agresivo","nombre":"FIC Conservador|FIC Equilibrio|FIC Crecimiento","perfil":"Conservador|Moderado|Agresivo","plazo":"corto plazo|mediano plazo|largo plazo","razon":"razón concreta en 1 frase","monto":"monto mencionado o no especificado"}
 
 REGLAS DE ROUTING:
-- conservador: riesgo bajo + retiraría el dinero + corto plazo + ingresos inestables o monto representa mucho de su patrimonio
-- moderado: riesgo medio + esperaría + mediano plazo + cierta experiencia previa
-- agresivo: riesgo alto + invertiría más + largo plazo + ingresos estables + patrimonio diversificado`;
+- conservador: preservar capital + corto plazo + retiraría ante caída + necesitan liquidez + monto es parte importante del patrimonio
+- moderado: crecer moderadamente + mediano plazo + esperarían + algo de experiencia + flujo estable
+- agresivo: maximizar retorno + largo plazo + invertirían más ante caída + experiencia previa + flujo sólido y diversificado`;
 }
 
 interface UseVoiceAgentOptions {
   voiceName?: string;
   financialContext?: string;
+  intakeData?: { nombre: string; empresa: string; sector: string };
   onRecommendation?: (rec: PortfolioRecommendation) => void;
 }
 
 export function useVoiceAgent({
   voiceName = "Zephyr",
   financialContext,
+  intakeData,
   onRecommendation,
 }: UseVoiceAgentOptions = {}) {
+  const transcriptBufferRef = useRef<string>("");
+  const onRecommendationRef = useRef(onRecommendation);
+  onRecommendationRef.current = onRecommendation;
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -224,12 +234,15 @@ export function useVoiceAgent({
 
             // Pedirle a Gemini que inicie la conversación sin que el usuario tenga que hablar primero
             sessionPromise.then(session => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (session as any).send({
-                clientContent: {
-                  turns: [{ role: "user", parts: [{ text: "Hola, acabo de entrar a la llamada. Por favor empieza según tus instrucciones (preséntate y pide mi nombre)." }] }]
-                }
-              });
+              try {
+                session.sendClientContent({
+                  turns: [{ role: "user", parts: [{ text: "Hola, acabo de entrar a la llamada. Por favor salúdame por mi nombre y empieza la entrevista según tus instrucciones." }] }],
+                  turnComplete: true,
+                });
+              } catch (_e) {
+                // Algunas versiones del SDK no soportan el saludo inicial — el usuario puede hablar primero
+                console.warn("sendClientContent not available on this SDK version");
+              }
             });
 
             // Configurar envío de audio del mic → Gemini
@@ -265,10 +278,23 @@ export function useVoiceAgent({
               stopAudioPlaybackInternal();
               setIsSpeaking(false);
             }
-            const base64Audio =
-              message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (base64Audio) {
-              playBase64Pcm(base64Audio);
+            const parts = message.serverContent?.modelTurn?.parts || [];
+            for (const part of parts) {
+              if (part.inlineData?.data) {
+                playBase64Pcm(part.inlineData.data);
+              }
+              // Detect PORTFOLIO tag in text transcripts
+              if (part.text) {
+                transcriptBufferRef.current += part.text;
+                const match = transcriptBufferRef.current.match(/PORTFOLIO:(\{.*?\})/);
+                if (match) {
+                  try {
+                    const rec: PortfolioRecommendation = JSON.parse(match[1]);
+                    onRecommendationRef.current?.(rec);
+                    transcriptBufferRef.current = "";
+                  } catch { /* ignore parse errors */ }
+                }
+              }
             }
           },
           onerror: (err) => {
@@ -294,7 +320,7 @@ export function useVoiceAgent({
               prebuiltVoiceConfig: { voiceName },
             },
           },
-          systemInstruction: buildSystemInstruction(financialContext),
+          systemInstruction: buildSystemInstruction(financialContext, intakeData),
         },
       });
 
@@ -306,7 +332,7 @@ export function useVoiceAgent({
       setIsConnecting(false);
       setIsConnected(false);
     }
-  }, [voiceName, financialContext, playBase64Pcm]);
+  }, [voiceName, financialContext, intakeData, playBase64Pcm]);
 
   // Cleanup al desmontar — deps vacío, usa ref
   useEffect(() => {
