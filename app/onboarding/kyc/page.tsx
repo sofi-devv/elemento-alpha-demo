@@ -336,6 +336,13 @@ export default function KycPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al analizar");
       setFinancialContext(data.summary);
+      try {
+        if (typeof window !== "undefined" && data.summary) {
+          sessionStorage.setItem("kyc_financial_summary", data.summary);
+        }
+      } catch {
+        /* ignore */
+      }
       setPhase("intro");
     } catch (err: unknown) {
       setAnalysisError(err instanceof Error ? err.message : "Error desconocido");
