@@ -74,6 +74,7 @@ const timelineSteps: {
         description:
           "Visualización y seguimiento del portafolio según perfil de riesgo",
         link: "Ver portafolios",
+        href: "/portfolio",
       },
     ],
   },
