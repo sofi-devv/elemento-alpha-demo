@@ -50,6 +50,13 @@ const timelineSteps: {
         link: "Comenzar",
         href: "/onboarding",
       },
+      {
+        icon: FileBarChart,
+        label: "Simulación SARLAFT",
+        description: "Carga documentos · IA extrae datos · Completa formularios · Exporta PDF",
+        link: "Ver simulación",
+        href: "/onboarding/sarlaft",
+      },
     ],
   },
   {

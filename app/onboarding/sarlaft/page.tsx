@@ -23,7 +23,53 @@ import { Button } from "@/components/ui/button";
 import { FieldByFieldForm } from "@/components/sarlaft/FieldByFieldForm";
 import { FormsPreview } from "@/components/sarlaft/FormsPreview";
 import type { SarlaftPackage, MissingFieldRef } from "@/lib/sarlaft/schema";
+import { SAGRILAFT_OTRAS_14_LABELS } from "@/lib/sarlaft/schema";
 import type { OcrReportItem } from "@/lib/sarlaft/ocrTypes";
+
+const DEMO_PACKAGE: SarlaftPackage = {
+  formulario_1: {
+    id_formulario: "1",
+    nombre_completo_razon_social: "Acropolis Labs S.A.S.",
+    tipo_y_numero_identificacion: "NIT 901.234.567-8",
+    num_oficinas_pais: 1,
+    num_oficinas_exterior: 0,
+    ciudades_paises_operacion: "Bogotá, Colombia",
+    politicas: {
+      programa_laft_documentado: { pregunta: "¿Su entidad tiene un programa/sistema LA/FT documentado y actualizado?", respuesta: "Sí", detalle_programa: { organo_aprobacion: "Junta Directiva", fecha_aprobacion: "2024-03-15" } },
+      regulacion_gubernamental_laft: { pregunta: "¿Su entidad está sujeta a regulación gubernamental LA/FT?", respuesta: "Sí", detalle_regulacion: { normatividad: "Ley 526 de 1999 / Decreto 1674 de 2021" } },
+      oficial_cumplimiento: { pregunta: "¿Tiene Oficial de Cumplimiento designado?", respuesta: "Sí", detalle_oficial: { nombre: "Carolina Gómez Ríos", identificacion: "52.845.123", cargo: "Oficial de Cumplimiento", email: "c.gomez@acropolislabs.co", telefono: "3001234567" } },
+      operaciones_efectivo: { pregunta: "¿Realiza operaciones en efectivo?", respuesta: "No" },
+      activos_virtuales: { pregunta: "¿Realiza transacciones o posee activos virtuales (criptomonedas)?", respuesta: "No" },
+      sancionada_investigada: { pregunta: "¿La entidad ha sido sancionada o investigada por procesos de lavado de activos?", respuesta: "No" },
+      otras_14_preguntas: SAGRILAFT_OTRAS_14_LABELS.map((etiqueta) => ({ etiqueta, respuesta: "No" as const })),
+    },
+  },
+  formulario_2: {
+    id_formulario: "2",
+    razon_social: "Acropolis Labs S.A.S.",
+    identificacion_tributaria: "901.234.567-8",
+    pais_constitucion_fiscal: "Colombia",
+    actividad_principal: "d) Negocios de instrumentos de inversión (Fondos)",
+    ingresos_activos_pasivos_50: "No",
+    clasificacion_fatca_crs: "Entidad participante",
+    ubo: { datos_personales: "Paula Torres — CC 1.020.456.789 — Representante Legal", paises_tin: [{ pais: "Colombia", tin: "1.020.456.789" }], tipo_control: "Control por propiedad" },
+  },
+  formulario_3: {
+    id_formulario: "3",
+    tipo_empresa: "S.A.S.",
+    cifras_financieras: { ingresos: 850000000, egresos: 620000000, total_activos: 1200000000, total_pasivos: 350000000, total_patrimonio: 850000000 },
+    administra_recursos_publicos: "No",
+    grupo_contable_niif: "Grupo 2 (Pymes)",
+    ciclo_empresa: "Joven/Crecimiento",
+    liquidez: "Algo relevante",
+    experiencia_inversion: "Fondos de Inversión",
+    tolerancia_riesgo: "Esperar/Invertir más aprovechando precios bajos",
+    representantes_ordenates: "Paula Torres — CC 1.020.456.789",
+    es_pep: "No",
+    accionistas: [{ nombre: "Paula Torres", id: "1.020.456.789", porcentaje: 60, cotiza_en_bolsa: "No" }, { nombre: "Santiago Rueda", id: "1.019.234.567", porcentaje: 40, cotiza_en_bolsa: "No" }],
+    calidad_beneficiario_final: ["Por Titularidad (Capital / Derechos de voto)", "Por Control (Representante legal / Mayor autoridad)"],
+  },
+};
 
 type Phase = "upload" | "analyzing" | "form" | "preview";
 
