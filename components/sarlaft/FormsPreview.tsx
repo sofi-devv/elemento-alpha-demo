@@ -26,12 +26,28 @@ export function FormsPreview({
   generating?: boolean;
   ocrReport?: OcrReportItem[] | null;
 }) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
   const ocrCount = ocrReport?.filter((r) => r.ocrUsed).length ?? 0;
   const h1 = useMemo(() => buildSagrilaftHtml(value.formulario_1), [value.formulario_1]);
   const h2 = useMemo(() => buildFatcaCrsHtml(value.formulario_2), [value.formulario_2]);
   const h3 = useMemo(() => buildVinculacionHtml(value.formulario_3), [value.formulario_3]);
   const missing = useMemo(() => computeMissingFields(value), [value]);
   const canPdf = !hasMissingFields(value);
+  const canSend = !hasMissingFields(value) && !sending && !generating;
+
+  const handleSendToFiduciaria = useCallback(async () => {
+    if (!canSend) return;
+    setSent(false);
+    setSending(true);
+    try {
+      // Demo UX: reutilizamos la generación del paquete como paso previo al envío.
+      await onGeneratePdf();
+      setSent(true);
+    } finally {
+      setSending(false);
+    }
+  }, [canSend, onGeneratePdf]);
 
   return (
     <div className="space-y-4">
@@ -52,18 +68,31 @@ export function FormsPreview({
           <p className="text-sm font-semibold text-[#1a1a1a]">Vista previa (formato PDF)</p>
           <p className="text-xs text-gray-500">
             {missing.length
-              ? `Faltan ${missing.length} campo(s) obligatorio(s) antes de exportar.`
-              : "Puedes ajustar datos clave abajo o generar el ZIP."}
+              ? `Faltan ${missing.length} campo(s) obligatorio(s) antes de enviar a la fiduciaria.`
+              : "Puedes ajustar datos clave abajo y luego enviar a la fiduciaria. La descarga en ZIP queda como respaldo."}
           </p>
+          {sent ? (
+            <p className="text-[11px] text-[#4a7c59] mt-1">Envío simulado a fiduciaria completado.</p>
+          ) : null}
         </div>
-        <Button
-          className="bg-[#1a1a1a] text-white shrink-0"
-          disabled={!canPdf || generating}
-          onClick={onGeneratePdf}
-        >
-          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-          Descargar PDFs (ZIP)
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+          <Button
+            className="bg-[#4a7c59] text-white"
+            disabled={!canSend}
+            onClick={handleSendToFiduciaria}
+          >
+            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Enviar a fiduciaria
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!canPdf || generating || sending}
+            onClick={onGeneratePdf}
+          >
+            {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Descargar ZIP
+          </Button>
+        </div>
       </div>
 
       <QuickEdit value={value} onChange={onChange} />
