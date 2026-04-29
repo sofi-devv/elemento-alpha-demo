@@ -33,19 +33,19 @@ interface Props {
 
 const PORTFOLIO_CONFIG = {
   conservador: {
-    label: "FIC Conservador",
-    tagline: "Seguridad y estabilidad ante todo",
+    label: "FIC líquido",
+    tagline: "Seguridad, liquidez y estabilidad",
     color: "#3b82f6",
     bg: "#eff6ff",
     ring: "ring-blue-200",
     icon: TrendingDown,
     metrics: [
-      { label: "Rentabilidad esperada", value: "5–8% E.A." },
+      { label: "Rentabilidad esperada", value: "7,63%" },
       { label: "Plazo mínimo", value: "3 meses" },
       { label: "Perfil de riesgo", value: "Bajo" },
-      { label: "Liquidez", value: "Alta (T+1)" },
+      { label: "Liquidez", value: "Alta" },
     ],
-    instruments: ["FIC Líquido", "Fondo Ahorro Empresarial", "Fiducia de Garantía"],
+    instruments: ["FIC líquido", "Fondo Ahorro Empresarial", "Fiducia de Garantía"],
     allocation: [
       { where: "Renta fija corto plazo (TES/CDT corporativo)", pct: "50%" },
       { where: "Fondos de liquidez y caja", pct: "30%" },
@@ -55,7 +55,7 @@ const PORTFOLIO_CONFIG = {
       "Ideal para empresas que priorizan la preservación del capital con retornos estables y acceso rápido a los recursos.",
   },
   moderado: {
-    label: "FIC Equilibrio",
+    label: "FIC Horizontes",
     tagline: "Balance entre crecimiento y seguridad",
     color: "#f59e0b",
     bg: "#fffbeb",
@@ -67,7 +67,7 @@ const PORTFOLIO_CONFIG = {
       { label: "Perfil de riesgo", value: "Medio" },
       { label: "Liquidez", value: "Media (T+3)" },
     ],
-    instruments: ["FIC Simple General", "Fondo Cartera", "Fondo de Capital Privado"],
+    instruments: ["FIC Horizontes", "Fondo Cartera", "Fondo de Capital Privado"],
     allocation: [
       { where: "Renta fija corporativa y pública", pct: "40%" },
       { where: "Fondos balanceados / cartera multiactivo", pct: "35%" },
@@ -77,7 +77,7 @@ const PORTFOLIO_CONFIG = {
       "Para empresas que buscan hacer crecer su patrimonio con una exposición controlada al riesgo.",
   },
   agresivo: {
-    label: "FIC Crecimiento",
+    label: "FIC ESTABLE",
     tagline: "Máximo potencial de retorno",
     color: "#4a7c59",
     bg: "#F0FEE6",
@@ -89,7 +89,7 @@ const PORTFOLIO_CONFIG = {
       { label: "Perfil de riesgo", value: "Alto" },
       { label: "Liquidez", value: "Baja (T+5)" },
     ],
-    instruments: ["Fondo Alternativo", "Fondo de Capital Privado", "Fiducia Inmobiliaria"],
+    instruments: ["FIC ESTABLE", "Fondo de Capital Privado", "Fiducia Inmobiliaria"],
     allocation: [
       { where: "Renta variable y activos de crecimiento", pct: "45%" },
       { where: "Fondos alternativos / private markets", pct: "35%" },
@@ -100,34 +100,15 @@ const PORTFOLIO_CONFIG = {
   },
 };
 
-function randomDefaultRecommendation(): PortfolioRecommendation {
-  const options: PortfolioRecommendation[] = [
-    {
-      portfolio: "conservador",
-      nombre: "FIC Conservador",
-      perfil: "Conservador",
-      plazo: "corto plazo",
-      razon: "Perfil orientado a preservar capital y priorizar liquidez en el corto plazo.",
-      productosRecomendados: ["FIC Líquido", "Fondo Ahorro Empresarial", "Fiducia de Garantía"],
-    },
-    {
-      portfolio: "moderado",
-      nombre: "FIC Equilibrio",
-      perfil: "Moderado",
-      plazo: "mediano plazo",
-      razon: "Perfil balanceado con crecimiento controlado y exposición intermedia al riesgo.",
-      productosRecomendados: ["FIC Simple General", "Fondo Cartera", "Fondo de Capital Privado"],
-    },
-    {
-      portfolio: "agresivo",
-      nombre: "FIC Crecimiento",
-      perfil: "Agresivo",
-      plazo: "largo plazo",
-      razon: "Perfil de crecimiento con mayor tolerancia a variaciones y enfoque de largo plazo.",
-      productosRecomendados: ["Fondo Alternativo", "Fondo de Capital Privado", "Fiducia Inmobiliaria"],
-    },
-  ];
-  return options[Math.floor(Math.random() * options.length)];
+function defaultConservativeRecommendation(): PortfolioRecommendation {
+  return {
+    portfolio: "conservador",
+    nombre: "FIC líquido",
+    perfil: "Conservador",
+    plazo: "corto plazo",
+    razon: "Perfil orientado a preservar capital y priorizar liquidez en el corto plazo.",
+    productosRecomendados: ["FIC líquido", "Fondo Ahorro Empresarial", "Fiducia de Garantía"],
+  };
 }
 
 const DOCUMENT_ITEMS = [
@@ -147,7 +128,7 @@ export function PortfolioStep({
   onBack,
 }: Props) {
   const [accepted, setAccepted] = useState(false);
-  const fallbackRec = useMemo(() => randomDefaultRecommendation(), []);
+  const fallbackRec = useMemo(() => defaultConservativeRecommendation(), []);
   const rec = recommendation ?? fallbackRec;
   const config = PORTFOLIO_CONFIG[rec.portfolio];
   const Icon = config.icon;

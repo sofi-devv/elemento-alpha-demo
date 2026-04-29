@@ -1,0 +1,26 @@
+{
+  "benchmark": {
+    "trm": 8.0,
+    "expectedReturn": 7.6289,
+    "volatility": 1.788,
+    "maxDrawdown": 2.094
+  },
+  "portfolio32": {
+    "trm": 3.3087,
+    "expectedReturn": 7.8035,
+    "volatility": 1.6793,
+    "maxDrawdown": 7.4066
+  },
+  "portfolio33": {
+    "trm": 3.9437,
+    "expectedReturn": 7.8174,
+    "volatility": 1.7147,
+    "maxDrawdown": 7.5547
+  },
+  "portfolio36": {
+    "trm": 3.4674,
+    "expectedReturn": 7.8286,
+    "volatility": 1.7609,
+    "maxDrawdown": 8.1466
+  }
+}

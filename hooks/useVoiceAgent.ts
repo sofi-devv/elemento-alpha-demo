@@ -17,6 +17,33 @@ export interface PortfolioRecommendation {
   productosRecomendados?: string[];
 }
 
+export type VoiceAgentMode = "onboarding" | "rebalance_advisor";
+
+function buildRebalanceAdvisorInstruction(rebalanceContext: string): string {
+  return `Eres el asesor de voz de Elemento Alpha en la pantalla de rebalanceo de portafolio (demo).
+Habla en español colombiano, profesional y cercano. Sé conciso; amplía solo si el usuario pide más detalle.
+
+Tu trabajo es responder preguntas por VOZ sobre la comparación entre el BENCHMARK ACTUAL (referencia) y la opción PORTFOLIO 32 (rebalanceo mostrado).
+NO debes guiar una encuesta de 6 preguntas. NO emitas bloques JSON ni la etiqueta PORTFOLIO:.
+
+DATOS OFICIALES — úsalos tal cual; no inventes cifras ni activos fuera de este bloque:
+---
+${rebalanceContext}
+---
+
+Reglas:
+- Si algo no está en los datos, dilo con claridad.
+- Puedes contrastar métricas (TRM, retorno esperado, volatilidad, max drawdown) y comentar la asignación por activo en términos comprensibles.
+- La serie histórica está normalizada (base 100); explícalo si preguntan por la gráfica.
+
+Al iniciar la conversación (cuando el usuario acaba de conectar):
+1) Saluda en una frase.
+2) Resume en 2 frases breves el trade-off entre benchmark y Portfolio 32 usando solo los datos anteriores.
+3) Invita a hacer preguntas libres por voz.
+
+Después responde solo lo que preguntan.`;
+}
+
 function buildSystemInstruction(
   financialContext?: string,
   intakeData?: { nombre: string; empresa: string; sector: string }
@@ -91,10 +118,10 @@ SCORING INTERNO (no lo expliques salvo que te lo pidan):
 - Suma total esperada: mínimo 6, máximo 21.
 
 CATÁLOGO APROBADO PARA PERSONA JURÍDICA (usa solo estos nombres):
-- FIC Líquido
+- FIC líquido
 - FIC Simple General
 - FIC Horizontes
-- FIC Estable
+- FIC ESTABLE
 - Fondo Alternativo
 - Fondo Cartera
 - Fondo Ahorro Empresarial
@@ -108,7 +135,7 @@ ROUTING:
 - agresivo: 16 a 21
 
 DESPUÉS de P6 (o si el usuario quiere terminar), da una conclusión breve en voz (máx 2 frases) y termina con EXACTAMENTE este bloque JSON en una sola línea sin formato adicional:
-PORTFOLIO:{"portfolio":"conservador|moderado|agresivo","nombre":"FIC Conservador|FIC Equilibrio|FIC Crecimiento","perfil":"Conservador|Moderado|Agresivo","plazo":"corto plazo|mediano plazo|largo plazo","razon":"razón concreta en 1 frase","monto":"monto mencionado o no especificado","productosRecomendados":["producto 1","producto 2","producto 3"]}
+PORTFOLIO:{"portfolio":"conservador|moderado|agresivo","nombre":"FIC líquido|FIC Horizontes|FIC ESTABLE","perfil":"Conservador|Moderado|Agresivo","plazo":"corto plazo|mediano plazo|largo plazo","razon":"razón concreta en 1 frase","monto":"monto mencionado o no especificado","productosRecomendados":["producto 1","producto 2","producto 3"]}
 
 PLAZO SUGERIDO:
 - conservador => corto plazo
@@ -116,9 +143,9 @@ PLAZO SUGERIDO:
 - agresivo => largo plazo
 
 SELECCIÓN DE PRODUCTOS (persona jurídica):
-- conservador: prioriza FIC Líquido, Fondo Ahorro Empresarial, Fiducia de Garantía.
-- moderado: prioriza FIC Simple General, Fondo Cartera, Fondo de Capital Privado.
-- agresivo: prioriza Fondo Alternativo, Fondo de Capital Privado, Fiducia Inmobiliaria.
+- conservador: prioriza FIC líquido, Fondo Ahorro Empresarial, Fiducia de Garantía.
+- moderado: prioriza FIC Horizontes, Fondo Cartera, Fondo de Capital Privado.
+- agresivo: prioriza FIC ESTABLE, Fondo de Capital Privado, Fiducia Inmobiliaria.
 
 IMPORTANTE:
 - productosRecomendados debe contener entre 2 y 4 productos exactos del catálogo aprobado.
@@ -127,13 +154,32 @@ IMPORTANTE:
 
 interface UseVoiceAgentOptions {
   voiceName?: string;
+  /** Por defecto perfilamiento onboarding; `rebalance_advisor` usa solo preguntas libres sobre benchmark vs Portfolio 32. */
+  mode?: VoiceAgentMode;
+  /** Bloque JSON/texto con métricas y asignaciones (requerido si mode === "rebalance_advisor"). */
+  rebalanceContext?: string;
   financialContext?: string;
   intakeData?: { nombre: string; empresa: string; sector: string };
   onRecommendation?: (rec: PortfolioRecommendation) => void;
 }
 
+function resolveSystemInstruction(opts: {
+  mode: VoiceAgentMode;
+  rebalanceContext?: string;
+  financialContext?: string;
+  intakeData?: { nombre: string; empresa: string; sector: string };
+}): string {
+  if (opts.mode === "rebalance_advisor") {
+    const ctx = opts.rebalanceContext?.trim();
+    return buildRebalanceAdvisorInstruction(ctx || "(Contexto de portafolio aún no disponible.)");
+  }
+  return buildSystemInstruction(opts.financialContext, opts.intakeData);
+}
+
 export function useVoiceAgent({
   voiceName = "Zephyr",
+  mode = "onboarding",
+  rebalanceContext,
   financialContext,
   intakeData,
   onRecommendation,
@@ -153,6 +199,8 @@ export function useVoiceAgent({
   const transcriptBufferRef = useRef<string>("");
   const onRecommendationRef = useRef(onRecommendation);
   onRecommendationRef.current = onRecommendation;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   // ── Reproducción de audio PCM base64 (24kHz) ─────────────────────────────
   const playBase64Pcm = useCallback((base64: string) => {
@@ -278,7 +326,12 @@ export function useVoiceAgent({
               prebuiltVoiceConfig: { voiceName },
             },
           },
-          systemInstruction: buildSystemInstruction(financialContext, intakeData),
+          systemInstruction: resolveSystemInstruction({
+            mode,
+            rebalanceContext,
+            financialContext,
+            intakeData,
+          }),
         },
         callbacks: {
           onopen: () => {
@@ -330,13 +383,15 @@ export function useVoiceAgent({
               // Detectar etiqueta PORTFOLIO en la transcripción de texto
               if (part.text) {
                 transcriptBufferRef.current += part.text;
-                const match = transcriptBufferRef.current.match(/PORTFOLIO:(\{[\s\S]*?\})/);
-                if (match) {
-                  try {
-                    const rec: PortfolioRecommendation = JSON.parse(match[1]);
-                    onRecommendationRef.current?.(rec);
-                    transcriptBufferRef.current = "";
-                  } catch { /* ignorar errores de parse */ }
+                if (modeRef.current !== "rebalance_advisor") {
+                  const match = transcriptBufferRef.current.match(/PORTFOLIO:(\{[\s\S]*?\})/);
+                  if (match) {
+                    try {
+                      const rec: PortfolioRecommendation = JSON.parse(match[1]);
+                      onRecommendationRef.current?.(rec);
+                      transcriptBufferRef.current = "";
+                    } catch { /* ignorar errores de parse */ }
+                  }
                 }
               }
             }
@@ -370,7 +425,7 @@ export function useVoiceAgent({
       cleanup();
       setIsConnecting(false);
     }
-  }, [voiceName, financialContext, intakeData, playBase64Pcm, stopAudioPlayback, cleanup]);
+  }, [voiceName, mode, rebalanceContext, financialContext, intakeData, playBase64Pcm, stopAudioPlayback, cleanup]);
 
   // Cleanup al desmontar
   useEffect(() => {

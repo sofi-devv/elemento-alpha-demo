@@ -43,11 +43,18 @@ export function FieldByFieldForm({
 
   const apply = useCallback(
     (ref: MissingFieldRef, value: unknown) => {
+      let nextPkg: SarlaftPackage | undefined;
       setPkg((prev) => {
-        const next = patchPackageValue(prev, ref, value);
-        onUpdate?.(next);
-        return next;
+        nextPkg = patchPackageValue(prev, ref, value);
+        return nextPkg;
       });
+      // Notificar al padre fuera del updater de setState (evita actualizar SarlaftPage durante el render/update del hijo).
+      if (nextPkg !== undefined) {
+        const snapshot = nextPkg;
+        queueMicrotask(() => {
+          onUpdate?.(snapshot);
+        });
+      }
     },
     [onUpdate]
   );
@@ -131,7 +138,7 @@ export function FieldByFieldForm({
       {/* Campo actual */}
       <div className="p-6">
         {current && (
-          <FieldInput
+          <MissingFieldInput
             key={`${current.fieldKey}-${currentIndex}`}
             ref_={current}
             pkg={pkg}
@@ -176,16 +183,21 @@ export function FieldByFieldForm({
   );
 }
 
-function FieldInput({
+/** Editor para un `MissingFieldRef`; reutilizable en vista previa SARLAFT. */
+export function MissingFieldInput({
   ref_,
   pkg,
   onApply,
+  suppressAutoFocus,
 }: {
   ref_: MissingFieldRef;
   pkg: SarlaftPackage;
   onApply: (r: MissingFieldRef, v: unknown) => void;
+  /** Si hay varios editores en pantalla (p. ej. vista previa), evitar autofoco en todos. */
+  suppressAutoFocus?: boolean;
 }) {
   const r = ref_;
+  const af = !suppressAutoFocus;
 
   if (r.type === "text") {
     const v = getF1F2F3String(pkg, r) ?? "";
@@ -197,7 +209,7 @@ function FieldInput({
           onChange={(e) => onApply(r, e.target.value)}
           className="h-12 text-base"
           placeholder={`Ingresa ${r.label.toLowerCase()}`}
-          autoFocus
+          autoFocus={af}
         />
       </div>
     );
@@ -214,7 +226,7 @@ function FieldInput({
           onChange={(e) => onApply(r, e.target.value === "" ? "" : Number(e.target.value))}
           className="h-12 text-base"
           placeholder="0"
-          autoFocus
+          autoFocus={af}
         />
       </div>
     );
@@ -233,7 +245,7 @@ function FieldInput({
           onChange={(e) => onApply(r, e.target.value === "" ? null : Number(e.target.value))}
           className="h-12 text-base"
           placeholder="0"
-          autoFocus
+          autoFocus={af}
         />
       </div>
     );
@@ -421,7 +433,7 @@ function FieldInput({
           onChange={(e) => onApply(r, { normatividad: e.target.value })}
           className="h-12 text-base"
           placeholder="Especifica la normatividad"
-          autoFocus
+          autoFocus={af}
         />
       </div>
     );
@@ -469,7 +481,7 @@ function FieldInput({
           onChange={(e) => onApply(r, { tipo_operaciones: e.target.value })}
           className="h-12 text-base"
           placeholder="Ej: Compra/venta de BTC, custodia..."
-          autoFocus
+          autoFocus={af}
         />
       </div>
     );

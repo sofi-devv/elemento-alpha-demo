@@ -7,8 +7,10 @@ import { buildSagrilaftHtml } from "@/lib/sarlaft/templates/sagrilaft";
 import { buildFatcaCrsHtml } from "@/lib/sarlaft/templates/fatcaCrs";
 import { buildVinculacionHtml } from "@/lib/sarlaft/templates/vinculacion";
 import type { OcrReportItem } from "@/lib/sarlaft/ocrTypes";
-import type { SarlaftPackage } from "@/lib/sarlaft/schema";
+import type { SarlaftPackage, MissingFieldRef } from "@/lib/sarlaft/schema";
 import { computeMissingFields, hasMissingFields } from "@/lib/sarlaft/missingFields";
+import { patchPackageValue } from "@/lib/sarlaft/patchPackage";
+import { MissingFieldInput } from "@/components/sarlaft/FieldByFieldForm";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
@@ -49,6 +51,16 @@ export function FormsPreview({
     }
   }, [canSend, onGeneratePdf]);
 
+  const handleApplyField = useCallback(
+    (ref: MissingFieldRef, val: unknown) => {
+      const next = patchPackageValue(value, ref, val);
+      queueMicrotask(() => {
+        onChange(next);
+      });
+    },
+    [value, onChange]
+  );
+
   return (
     <div className="space-y-4">
       {ocrCount > 0 ? (
@@ -68,7 +80,7 @@ export function FormsPreview({
           <p className="text-sm font-semibold text-[#1a1a1a]">Vista previa (formato PDF)</p>
           <p className="text-xs text-gray-500">
             {missing.length
-              ? `Faltan ${missing.length} campo(s) obligatorio(s) antes de enviar a la fiduciaria.`
+              ? `Faltan ${missing.length} campo(s) obligatorio(s). Complétalos en el bloque siguiente antes de enviar a la fiduciaria.`
               : "Puedes ajustar datos clave abajo y luego enviar a la fiduciaria. La descarga en ZIP queda como respaldo."}
           </p>
           {sent ? (
@@ -94,6 +106,38 @@ export function FormsPreview({
           </Button>
         </div>
       </div>
+
+      {missing.length > 0 ? (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 ring-1 ring-amber-100/80"
+          role="region"
+          aria-label="Editar campos obligatorios pendientes"
+        >
+          <p className="text-sm font-semibold text-amber-950 mb-1">Completa aquí los obligatorios</p>
+          <p className="text-xs text-amber-900/80 mb-4">
+            Los mismos controles que en el paso “Completar información”. Al guardar, se actualiza la vista previa PDF.
+          </p>
+          <div className="space-y-4">
+            {missing.map((field, idx) => (
+              <div
+                key={`${field.formId}-${field.sectionKey}-${field.fieldKey}-${idx}`}
+                className="rounded-xl border border-amber-100 bg-white p-4 shadow-sm"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-800/90 mb-3">
+                  {field.formId === "1" ? "SAGRILAFT" : field.formId === "2" ? "FATCA / CRS" : "Vinculación PJ"} ·{" "}
+                  <span className="normal-case">{field.sectionLabel}</span>
+                </p>
+                <MissingFieldInput
+                  ref_={field}
+                  pkg={value}
+                  onApply={handleApplyField}
+                  suppressAutoFocus
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <QuickEdit value={value} onChange={onChange} />
 
