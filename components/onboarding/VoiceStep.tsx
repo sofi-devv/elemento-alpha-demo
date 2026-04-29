@@ -57,15 +57,36 @@ export function VoiceStep({ intake, onRecommendation, onNext, onBack }: Props) {
     if (questionIdx >= 3) setQuestionIdx(5); // show all done
   };
 
+  const canAdvance = receivedRec || !isConnected;
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" onClick={onBack} className="text-gray-400 hover:text-gray-700 flex items-center gap-1.5 text-sm px-0">
+          <ArrowLeft className="w-4 h-4" /> Volver
+        </Button>
+        <Button
+          id="voice-next-top"
+          onClick={onNext}
+          disabled={!canAdvance}
+          className={`rounded-lg px-5 h-9 font-semibold text-sm flex items-center gap-2 transition-all duration-200 ${
+            canAdvance ? "bg-[#4a7c59] text-white hover:bg-[#3f6b4c] shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0" : "bg-gray-100 text-gray-400"
+          }`}
+        >
+          {receivedRec ? "Siguiente" : "Avanzar"}
+          <ChevronRight className="w-4 h-4" />
+        </Button>
+      </div>
+
       {/* Intro card */}
       <div className="text-center py-4">
+        <p className="text-xs font-semibold text-[#6abf1a] uppercase tracking-wider mb-2">Paso 5 · Asesor</p>
         <h2 className="text-2xl font-bold text-[#1a1a1a] tracking-tight">
-          Hola, {intake.nombre.split(" ")[0]} 👋
+          Hola{(intake.nombre.trim() ? `, ${intake.nombre.trim().split(/\s+/)[0]}` : "")} 👋
         </h2>
         <p className="text-sm text-gray-500 mt-2 max-w-sm mx-auto leading-relaxed">
-          Nuestro asesor de IA te hará <strong>5 preguntas cortas</strong> para recomendarle a {intake.empresa} el portafolio ideal. Puedes terminar cuando quieras.
+          El asesor de IA hará <strong>5 preguntas</strong> sobre la empresa para proponer un portafolio a{" "}
+          <strong>{intake.empresa.trim() || "tu empresa"}</strong>. Puedes terminar cuando quieras.
         </p>
       </div>
 
@@ -126,7 +147,7 @@ export function VoiceStep({ intake, onRecommendation, onNext, onBack }: Props) {
             <Button
               id="voice-start"
               onClick={startSession}
-              className="rounded-full px-8 h-11 bg-[#BBE795] text-[#1a1a1a] hover:bg-[#8fd94a] font-semibold shadow-[0_4px_16px_rgba(187,231,149,0.4)] flex items-center gap-2"
+              className="rounded-full px-8 h-11 bg-[#4a7c59] text-white hover:bg-[#3f6b4c] font-semibold shadow-[0_4px_16px_rgba(74,124,89,0.35)] flex items-center gap-2"
             >
               <MessageSquare className="w-4 h-4" /> Iniciar entrevista de voz
             </Button>
@@ -155,24 +176,7 @@ export function VoiceStep({ intake, onRecommendation, onNext, onBack }: Props) {
         </div>
       )}
 
-      {/* Nav */}
-      <div className="flex items-center justify-between pt-2">
-        <Button variant="ghost" onClick={onBack} className="text-gray-400 hover:text-gray-700 flex items-center gap-1.5 text-sm">
-          <ArrowLeft className="w-4 h-4" /> Volver
-        </Button>
-        <Button
-          id="voice-next"
-          onClick={onNext}
-          className={`rounded-xl px-6 h-10 font-semibold text-sm flex items-center gap-2 transition-all duration-300 ${
-            receivedRec || !isConnected
-              ? "bg-[#1a1a1a] text-white hover:bg-black shadow-md"
-              : "bg-gray-100 text-gray-400"
-          }`}
-        >
-          {receivedRec ? "Continuar a documentos" : "Saltar este paso"}
-          <ChevronRight className="w-4 h-4" />
-        </Button>
-      </div>
+      <div className="pt-1" />
     </div>
   );
 }

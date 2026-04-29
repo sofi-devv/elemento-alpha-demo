@@ -128,3 +128,39 @@
     @apply font-sans;
   }
 }
+
+/* KYC demo: scanning beam over document preview */
+@keyframes kyc-beam {
+  0% {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(320%);
+    opacity: 0;
+  }
+}
+
+.kyc-scan-beam {
+  animation: kyc-beam 2.2s ease-in-out infinite;
+}
+
+@keyframes kyc-pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 oklch(0.85 0.15 145 / 0.45);
+  }
+  50% {
+    box-shadow: 0 0 0 12px oklch(0.85 0.15 145 / 0);
+  }
+}
+
+.kyc-verify-pulse {
+  animation: kyc-pulse-ring 2s ease-out infinite;
+}

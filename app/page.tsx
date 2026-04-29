@@ -37,16 +37,16 @@ const timelineSteps: {
   {
     phase: 1,
     title: "Onboarding",
-    subtitle: "Entrevista · KYC · SARLAFT · Portafolio",
+    subtitle: "Ingesta · KYC · Asesor · Portafolio",
     status: "active" as const,
     date: "Fase 1",
     description:
-      "Proceso de vinculación del cliente: formulario de datos básicos, entrevista de objetivos con IA de voz, carga de documentos KYC + SARLAFT, y recomendación de portafolio personalizada.",
+      "Vinculación de persona jurídica: datos del representante legal y la empresa, documentación corporativa, KYC del representante legal, asesor por voz y portafolio con envíos regulatorios al aceptar.",
     items: [
       {
         icon: UserCheck,
         label: "Iniciar proceso de vinculación",
-        description: "Datos · Entrevista de voz · Documentos · Portafolio — todo en un solo flujo",
+        description: "Empresa (PJ) · Documentación · KYC RL · Asesor · Portafolio",
         link: "Comenzar",
         href: "/onboarding",
       },

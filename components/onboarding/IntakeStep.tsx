@@ -13,6 +13,7 @@ interface Props {
   data: IntakeData;
   onChange: (d: IntakeData) => void;
   onNext: (d: IntakeData) => void;
+  onBack?: () => void;
 }
 
 type QuestionId = "nombre" | "empresa" | "sector";
@@ -30,29 +31,29 @@ const QUESTIONS: Question[] = [
   {
     id: "nombre",
     index: 1,
-    question: "¿Cuál es tu nombre completo?",
-    hint: "¡Bienvenido! Me alegra conocerte 👋",
+    question: "¿Nombre completo del representante legal?",
+    hint: "Persona autorizada para firmar y vincular a la empresa en este proceso.",
     type: "text",
-    placeholder: "Ej. María Camila Rodríguez",
+    placeholder: "Ej. María Camila Rodríguez Muñoz",
   },
   {
     id: "empresa",
     index: 2,
-    question: "¿Cuál es el nombre de tu empresa?",
-    hint: "La empresa que vas a vincular al proceso KYC 🏢",
+    question: "¿Razón social de la empresa?",
+    hint: "Persona jurídica tal como figura en cámara de comercio / RUT.",
     type: "text",
     placeholder: "Ej. Acropolis Labs S.A.S.",
   },
   {
     id: "sector",
     index: 3,
-    question: "¿En qué sector opera tu empresa?",
-    hint: "Selecciona la opción que mejor te describe 🎯",
+    question: "¿En qué sector opera la empresa?",
+    hint: "Selecciona el sector principal de la compañía.",
     type: "chips",
   },
 ];
 
-export function IntakeStep({ data, onChange, onNext }: Props) {
+export function IntakeStep({ data, onChange, onNext, onBack }: Props) {
   const [currentQ, setCurrentQ] = useState(0);
   const [animating, setAnimating] = useState(false);
   const [direction, setDirection] = useState<"forward" | "back">("forward");
@@ -95,7 +96,10 @@ export function IntakeStep({ data, onChange, onNext }: Props) {
   }, [validate, q.id, isLast, onNext, data]);
 
   const goBack = () => {
-    if (currentQ === 0) return;
+    if (currentQ === 0) {
+      onBack?.();
+      return;
+    }
     setDirection("back");
     setAnimating(true);
     setTimeout(() => {
@@ -113,6 +117,22 @@ export function IntakeStep({ data, onChange, onNext }: Props) {
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-120px)]">
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={goBack}
+          disabled={currentQ === 0 && !onBack}
+          className="h-9 px-0 text-sm text-gray-400 hover:text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+        >
+          ← {currentQ === 0 ? "Volver" : "Anterior"}
+        </button>
+        <button
+          onClick={goNext}
+          className="flex items-center gap-2 px-5 h-9 rounded-lg bg-[#4a7c59] text-white text-sm font-semibold hover:bg-[#3f6b4c] transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
+        >
+          {isLast ? "Siguiente" : "Continuar"} <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+      <p className="text-xs font-semibold text-[#6abf1a] uppercase tracking-wider mb-3">Paso 2 · Empresa (PJ)</p>
       {/* Progress bar */}
       <div className="w-full h-0.5 bg-gray-100 rounded-full overflow-hidden mb-12">
         <div
@@ -222,13 +242,13 @@ export function IntakeStep({ data, onChange, onNext }: Props) {
             <button
               id="intake-next"
               onClick={goNext}
-              className="flex items-center gap-2 px-6 h-11 rounded-xl bg-[#1a1a1a] text-white text-sm font-semibold hover:bg-black transition-all duration-200 shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
+              className="flex items-center gap-2 px-6 h-11 rounded-xl bg-[#4a7c59] text-white text-sm font-semibold hover:bg-[#3f6b4c] transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0"
             >
-              {isLast ? "Comenzar entrevista" : "OK"}
+              {isLast ? "Continuar a documentación" : "OK"}
               {isLast ? (
                 <ChevronRight className="w-4 h-4" />
               ) : (
-                <span className="text-[#BBE795]">✓</span>
+                <span className="text-[#d8f3bf]">✓</span>
               )}
             </button>
             {currentQ > 0 && (
