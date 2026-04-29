@@ -3,15 +3,11 @@
 import * as React from "react";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  ASSET_ALLOCATION,
-  PORTFOLIO_METRICS,
-  getActiveAssets,
-} from "@/lib/portfolio/portfolioData";
+import { PORTFOLIO_METRICS } from "@/lib/portfolio/portfolioData";
 import type { PortfolioTimeSeriesPoint } from "@/lib/portfolio/portfolioHistory";
 import { useNarration } from "@/hooks/useNarration";
-import { AssetAllocationChart } from "@/components/portfolio/AssetAllocationChart";
 import { RaceChart } from "@/components/portfolio/RaceChart";
+import { AllocationComparison } from "@/components/portfolio/AllocationComparison";
 
 const NARRATION_TEXT =
   "Te presento una oportunidad de rebalanceo para tu portafolio. El Portfolio 32 ofrece un retorno esperado del siete coma ocho por ciento anual, con una volatilidad de solo uno coma sesenta y ocho por ciento, la más baja de nuestras opciones. Su máximo drawdown histórico es del siete coma cuatro por ciento. Observa cómo se comporta comparado con tu benchmark actual.";
@@ -29,8 +25,8 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
 
   const hasStartedSpeakingRef = React.useRef(false);
   const mountedRef = React.useRef(true);
+  const [comparisonActive, setComparisonActive] = React.useState(false);
 
-  const benchmarkAssets = getActiveAssets("benchmark");
   const opt32 = PORTFOLIO_METRICS.portfolio32;
 
   // Iniciar narración al montar
@@ -41,7 +37,10 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
     const timerId = setTimeout(() => {
       if (!mountedRef.current) return;
       void speak(NARRATION_TEXT).catch(() => {
-        if (mountedRef.current) setRaceActive(true);
+        if (mountedRef.current) {
+          setComparisonActive(true);
+          setRaceActive(true);
+        }
       });
     }, 10);
 
@@ -58,6 +57,7 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
   React.useEffect(() => {
     if (isSpeaking && !hasStartedSpeakingRef.current) {
       hasStartedSpeakingRef.current = true;
+      setComparisonActive(true);
       setRaceActive(true);
     }
   }, [isSpeaking]);
@@ -71,6 +71,7 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
 
   React.useEffect(() => {
     if (!isSpeaking && !isLoading && triedSpeakingRef.current && !raceActive) {
+      setComparisonActive(true);
       setRaceActive(true);
     }
   }, [isSpeaking, isLoading, raceActive]);
@@ -138,15 +139,9 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
         <MetricTile label="Max drawdown" value={`${opt32.maxDrawdown}%`} />
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
-          <p className="mb-4 text-sm font-bold text-[#1a1a1a]">Benchmark — allocation</p>
-          <AssetAllocationChart allocations={benchmarkAssets} variant="benchmark" />
-        </div>
-        <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-[#BBE795]/40">
-          <p className="mb-4 text-sm font-bold text-[#1a1a1a]">Portfolio 32 — allocation</p>
-          <AssetAllocationChart allocations={ASSET_ALLOCATION} variant="portfolio32" />
-        </div>
+      <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
+        <p className="mb-4 text-sm font-bold text-[#1a1a1a]">Comparación de asignaciones</p>
+        <AllocationComparison active={comparisonActive} />
       </div>
 
       <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-gray-100">
@@ -168,7 +163,11 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
               setRaceDone(false);
               setReplayKey((k) => k + 1);
               setRaceActive(false);
-              window.setTimeout(() => setRaceActive(true), 50);
+              setComparisonActive(false);
+              window.setTimeout(() => {
+                setComparisonActive(true);
+                setRaceActive(true);
+              }, 50);
             }}
           >
             Repetir animación
