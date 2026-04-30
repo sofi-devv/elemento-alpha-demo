@@ -20,11 +20,11 @@ import { format } from "date-fns";
 
 const chartConfig = {
   provided: {
-    label: "Benchmark",
+    label: "Tu portafolio actual",
     color: "#94a3b8",
   },
   portfolio32: {
-    label: "Portfolio 32",
+    label: "Sugerido",
     color: "#6abf1a",
   },
 } as const;
@@ -119,11 +119,11 @@ export function RaceChart({
             <p className="font-semibold text-[#1a1a1a]">{last.date}</p>
           </div>
           <div className="rounded-xl bg-[#F0FEE6] px-3 py-2 ring-1 ring-[#BBE795]/40 shadow-sm">
-            <span className="text-[#6abf1a]">Benchmark</span>
+            <span className="text-[#6abf1a]">Tu portafolio actual</span>
             <p className="font-mono font-bold text-[#1a1a1a]">{last.provided.toFixed(2)}</p>
           </div>
           <div className="rounded-xl bg-white px-3 py-2 ring-1 ring-[#BBE795]/50 shadow-sm">
-            <span className="text-[#4a7c59]">Portfolio 32</span>
+            <span className="text-[#4a7c59]">Sugerido</span>
             <p className="font-mono font-bold text-[#1a1a1a]">{last.portfolio32.toFixed(2)}</p>
           </div>
         </div>
@@ -169,7 +169,7 @@ export function RaceChart({
           <Line
             type="monotone"
             dataKey="provided"
-            name="Benchmark"
+            name="Tu portafolio actual"
             stroke="var(--color-provided)"
             strokeWidth={2}
             dot={false}
@@ -178,7 +178,7 @@ export function RaceChart({
           <Line
             type="monotone"
             dataKey="portfolio32"
-            name="Portfolio 32"
+            name="Sugerido"
             stroke="var(--color-portfolio32)"
             strokeWidth={2}
             dot={false}

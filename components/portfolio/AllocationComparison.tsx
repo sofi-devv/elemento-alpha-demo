@@ -144,7 +144,7 @@ export function AllocationComparison({ active }: AllocationComparisonProps) {
       {/* Gráficos lado a lado con flecha */}
       <div className="flex items-center justify-center gap-4">
         <div className="flex-1 max-w-[220px]">
-          <p className="text-center text-xs font-semibold text-gray-500 mb-2">Benchmark</p>
+          <p className="text-center text-xs font-semibold text-gray-500 mb-2">Tu portafolio actual</p>
           <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-gray-100">
             <MiniPieChart variant="benchmark" animate={active} />
           </div>
@@ -156,7 +156,7 @@ export function AllocationComparison({ active }: AllocationComparisonProps) {
         </div>
 
         <div className="flex-1 max-w-[220px]">
-          <p className="text-center text-xs font-semibold text-[#6abf1a] mb-2">Portfolio 32</p>
+          <p className="text-center text-xs font-semibold text-[#6abf1a] mb-2">Sugerido</p>
           <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#BBE795]/50">
             <MiniPieChart variant="portfolio32" animate={active} />
           </div>

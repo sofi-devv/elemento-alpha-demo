@@ -36,7 +36,7 @@ export function BenchmarkView({
           Tu portafolio de referencia
         </h1>
         <p className="max-w-2xl text-sm leading-relaxed text-gray-600">
-          Distribución basada en el benchmark institucional y evolución histórica del índice normalizado (base 100).
+          Distribución de tu portafolio actual de referencia y evolución histórica del índice normalizado (base 100).
         </p>
       </div>
 
@@ -68,7 +68,7 @@ export function BenchmarkView({
             </span>
             <div>
               <p className="text-sm font-bold text-[#1a1a1a]">Asset allocation</p>
-              <p className="text-xs text-gray-500">Benchmark — pesos objetivo (%)</p>
+              <p className="text-xs text-gray-500">Tu portafolio actual — pesos objetivo (%)</p>
             </div>
           </div>
           <AssetAllocationChart allocations={benchmarkAssets} variant="benchmark" />
@@ -111,7 +111,7 @@ export function BenchmarkView({
         <div>
           <p className="text-sm font-bold text-[#1a1a1a]">Oportunidad de rebalanceo</p>
           <p className="text-xs text-gray-600">
-            Descubre el Portfolio 32 con narración guiada y comparación histórica frente al benchmark.
+            Descubre el portafolio sugerido con narración guiada y comparación histórica frente al tuyo actual.
           </p>
         </div>
         <Button

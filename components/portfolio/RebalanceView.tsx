@@ -82,17 +82,17 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
             className="-ml-2 h-auto gap-2 px-2 py-1 text-gray-500 hover:text-[#1a1a1a]"
           >
             <ArrowLeft className="h-4 w-4" />
-            Volver al benchmark
+            Volver a tu portafolio actual
           </Button>
           <p className="text-xs font-bold uppercase tracking-widest text-[#6abf1a]">
-            Portfolio 32 · rebalanceo
+            Sugerido · rebalanceo
           </p>
           <h1 className="text-3xl font-bold tracking-tight text-[#1a1a1a]">
-            Comparación frente al benchmark
+            Comparación frente a tu portafolio actual
           </h1>
           <p className="max-w-2xl text-sm leading-relaxed text-gray-600">
             Gráficos con serie histórica normalizada (base 100). Pulsa el micrófono flotante para hablar con el
-            asesor: tiene el contexto de benchmark y Portfolio 32 de esta pantalla.
+            asesor: tiene el contexto de tu portafolio actual y la opción sugerida de esta pantalla.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -123,7 +123,7 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-[#6abf1a]">
                   Asesor por voz
                 </p>
-                <p className="text-sm font-bold text-[#1a1a1a] leading-snug">Benchmark vs Portfolio 32</p>
+                <p className="text-sm font-bold text-[#1a1a1a] leading-snug">Tu portafolio actual vs Sugerido</p>
               </div>
               <button
                 type="button"
@@ -241,7 +241,7 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
           <div>
             <p className="text-sm font-bold text-[#1a1a1a]">Carrera histórica</p>
             <p className="text-xs text-gray-500">
-              Dos líneas desde base 100: benchmark vs Portfolio 32
+              Dos líneas desde base 100: tu portafolio actual vs sugerido
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" className="rounded-xl text-xs" onClick={handleReplay}>
@@ -265,7 +265,7 @@ export function RebalanceView({ timeSeries, onBack }: RebalanceViewProps) {
       <div className="rounded-2xl bg-[#FAFAFA] p-5 ring-1 ring-gray-100">
         <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Resumen</p>
         <p className="mt-2 text-sm leading-relaxed text-gray-700">
-          El Portfolio 32 prioriza menor volatilidad histórica ({opt32.volatility}%) frente al benchmark,
+          El portafolio sugerido prioriza menor volatilidad histórica ({opt32.volatility}%) frente a tu portafolio actual,
           manteniendo un retorno esperado cercano al{" "}
           <span className="font-semibold text-[#1a1a1a]">{opt32.expectedReturn}%</span>.
           La animación muestra cómo ambas trayectorias evolucionan en el tiempo con base 100.
@@ -352,7 +352,7 @@ function MetricHoverComparison({
         <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Antes vs rebalanceo</p>
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <span className="w-[6.5rem] shrink-0 text-[10px] leading-tight text-gray-500">Portafolio actual</span>
+            <span className="w-[6.5rem] shrink-0 text-[10px] leading-tight text-gray-500">Tu portafolio actual</span>
             <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
               <div
                 className="h-full origin-left scale-x-0 rounded-full bg-gray-400 transition-transform duration-500 ease-out group-hover:scale-x-100"
@@ -364,7 +364,7 @@ function MetricHoverComparison({
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-[6.5rem] shrink-0 text-[10px] leading-tight text-[#4a7c59]">Portfolio 32</span>
+            <span className="w-[6.5rem] shrink-0 text-[10px] leading-tight text-[#4a7c59]">Sugerido</span>
             <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-[#e8f5e0]/80">
               <div
                 className={`h-full origin-left scale-x-0 rounded-full transition-transform duration-500 ease-out delay-100 group-hover:scale-x-100 ${

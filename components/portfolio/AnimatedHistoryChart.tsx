@@ -18,7 +18,7 @@ import { format } from "date-fns";
 
 const chartConfig = {
   provided: {
-    label: "Benchmark",
+    label: "Tu portafolio actual",
     color: "#6abf1a",
   },
 } satisfies Record<string, { label: string; color: string }>;

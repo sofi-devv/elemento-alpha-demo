@@ -49,7 +49,7 @@ export const HISTORICAL_DATA: HistoricalDataPoint[] = historicalDataRaw as Histo
 export const PORTFOLIO_OPTIONS: PortfolioOption[] = [
   {
     id: "benchmark",
-    name: "Portafolio actual",
+    name: "Tu portafolio actual",
     description: "Portafolio de referencia actual",
     metrics: PORTFOLIO_METRICS.benchmark,
     allocation: ASSET_ALLOCATION.map((a) => ({
@@ -61,7 +61,7 @@ export const PORTFOLIO_OPTIONS: PortfolioOption[] = [
   },
   {
     id: "portfolio32",
-    name: "Portfolio 32",
+    name: "Sugerido",
     description: "Opción de rebalanceo con menor volatilidad",
     metrics: PORTFOLIO_METRICS.portfolio32,
     allocation: ASSET_ALLOCATION,
