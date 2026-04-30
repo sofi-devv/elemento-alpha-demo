@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   TrendingDown,
   BarChart2,
@@ -9,24 +9,17 @@ import {
   Clock,
   Leaf,
   RefreshCw,
-  RotateCcw,
-  FileStack,
   ChevronRight,
   ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FormsPreview } from "@/components/sarlaft/FormsPreview";
 import type { PortfolioRecommendation } from "@/hooks/useVoiceAgent";
 import type { IntakeData } from "@/app/onboarding/page";
-import type { SarlaftPackage } from "@/lib/sarlaft/schema";
 
 interface Props {
   intake: IntakeData;
   recommendation: PortfolioRecommendation | null;
-  sarlaftPkg: SarlaftPackage;
-  onSarlaftChange: (p: SarlaftPackage) => void;
-  onGeneratePdf: () => Promise<void>;
-  generating: boolean;
+  onNext: () => void;
   onRestart: () => void;
   onBack?: () => void;
 }
@@ -111,23 +104,13 @@ function defaultConservativeRecommendation(): PortfolioRecommendation {
   };
 }
 
-const DOCUMENT_ITEMS = [
-  "Paquete SARLAFT / FATCA / CRS / Vinculación (PDF editables y ZIP)",
-  "Documentación cargada en ingesta (RUT, cámara de comercio, otros)",
-  "Verificación KYC del representante legal",
-];
-
 export function PortfolioStep({
   intake,
   recommendation,
-  sarlaftPkg,
-  onSarlaftChange,
-  onGeneratePdf,
-  generating,
+  onNext,
   onRestart,
   onBack,
 }: Props) {
-  const [accepted, setAccepted] = useState(false);
   const fallbackRec = useMemo(() => defaultConservativeRecommendation(), []);
   const rec = recommendation ?? fallbackRec;
   const config = PORTFOLIO_CONFIG[rec.portfolio];
@@ -140,11 +123,6 @@ export function PortfolioStep({
     (k) => k !== rec.portfolio
   );
 
-  const handleRestart = () => {
-    setAccepted(false);
-    onRestart();
-  };
-
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
       <div className="flex items-center justify-between">
@@ -155,26 +133,7 @@ export function PortfolioStep({
         ) : (
           <span />
         )}
-        {!accepted ? (
-          <Button
-            id="portfolio-accept-top"
-            type="button"
-            onClick={() => setAccepted(true)}
-            className="h-9 px-5 rounded-lg font-semibold gap-1.5 bg-[#4a7c59] text-white hover:bg-[#3f6b4c] transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
-          >
-            Aceptar portafolio <ChevronRight className="h-4 w-4" />
-          </Button>
-        ) : (
-          <Button
-            id="portfolio-restart-top"
-            type="button"
-            variant="ghost"
-            onClick={handleRestart}
-            className="h-9 px-3 text-gray-500 gap-1.5"
-          >
-            <RotateCcw className="h-3.5 w-3.5" /> Reiniciar
-          </Button>
-        )}
+        <span />
       </div>
 
       <header>
@@ -183,7 +142,7 @@ export function PortfolioStep({
           Recomendación para {intake.empresa.trim() || "tu empresa"}
         </h2>
         <p className="text-sm text-gray-500 mt-2 leading-relaxed max-w-xl">
-          Revisa el portafolio sugerido. Al aceptarlo podrás revisar y enviar la documentación regulatoria.
+          Revisa el portafolio sugerido y continúa para completar la documentación regulatoria.
         </p>
       </header>
 
@@ -333,85 +292,25 @@ export function PortfolioStep({
         </div>
       </div>
 
-      {!accepted ? (
-        <div className="space-y-2 pt-2">
-          <Button
-            id="portfolio-accept"
-            type="button"
-            className="w-full h-11 rounded-lg font-semibold text-sm gap-1.5 bg-[#4a7c59] text-white hover:bg-[#3f6b4c] shadow-sm hover:shadow-md transition-all duration-200"
-            onClick={() => setAccepted(true)}
-          >
-            Aceptar portafolio recomendado <ChevronRight className="w-4 h-4" />
-          </Button>
-          <Button
-            id="portfolio-restart"
-            variant="ghost"
-            type="button"
-            onClick={handleRestart}
-            className="w-full h-9 rounded-lg text-sm text-gray-500 hover:text-gray-700 gap-1.5"
-          >
-            <RotateCcw className="w-3.5 h-3.5" /> Reiniciar proceso
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-5 pt-2 animate-in fade-in duration-300">
-          <div className="rounded-lg border border-[#BBE795] bg-[#F0FEE6]/50 px-4 py-3 flex items-start gap-3">
-            <CheckCircle2 className="w-5 h-5 text-[#4a7c59] shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm font-semibold text-[#1a1a1a]">Portafolio aceptado</p>
-              <p className="text-xs text-gray-600 mt-0.5 leading-relaxed">
-                Aquí tienes el paquete regulatorio generado y lo que puedes enviar para cerrar la vinculación.
-              </p>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-gray-100 bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-3">
-              <FileStack className="w-5 h-5 text-[#4a7c59]" />
-              <p className="text-sm font-bold text-[#1a1a1a]">Documentación que puedes enviar</p>
-            </div>
-            <ul className="space-y-2 text-sm text-gray-600">
-              {DOCUMENT_ITEMS.map((item) => (
-                <li key={item} className="flex gap-2">
-                  <span className="text-[#4a7c59] shrink-0 mt-0.5">·</span>
-                  <span className="leading-relaxed">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">
-              Formularios SARLAFT (editables)
-            </p>
-            <FormsPreview
-              value={sarlaftPkg}
-              onChange={onSarlaftChange}
-              onGeneratePdf={onGeneratePdf}
-              generating={generating}
-              ocrReport={null}
-            />
-          </div>
-
-          <div className="space-y-2 pt-1">
-            <Button
-              id="portfolio-contact"
-              type="button"
-              className="w-full h-11 rounded-lg font-semibold text-sm bg-[#4a7c59] text-white hover:bg-[#3f6b4c] shadow-sm hover:shadow-md transition-all duration-200"
-            >
-              Hablar con un asesor de Elemento Alpha
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleRestart}
-              className="w-full h-9 rounded-lg text-sm text-gray-500 hover:text-gray-700 gap-1.5"
-            >
-              <RotateCcw className="w-3.5 h-3.5" /> Reiniciar proceso
-            </Button>
-          </div>
-        </div>
-      )}
+      <div className="space-y-2 pt-2">
+        <Button
+          id="portfolio-continue"
+          type="button"
+          className="w-full h-11 rounded-lg font-semibold text-sm gap-1.5 bg-[#4a7c59] text-white hover:bg-[#3f6b4c] shadow-sm hover:shadow-md transition-all duration-200"
+          onClick={onNext}
+        >
+          Continuar con SARLAFT <ChevronRight className="w-4 h-4" />
+        </Button>
+        <Button
+          id="portfolio-restart"
+          variant="ghost"
+          type="button"
+          onClick={onRestart}
+          className="w-full h-9 rounded-lg text-sm text-gray-500 hover:text-gray-700"
+        >
+          Reiniciar proceso
+        </Button>
+      </div>
     </div>
   );
 }

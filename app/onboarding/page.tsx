@@ -7,8 +7,10 @@ import { DocumentIngestStep } from "@/components/onboarding/DocumentIngestStep";
 import { KycValidationStep } from "@/components/onboarding/KycValidationStep";
 import { VoiceStep } from "@/components/onboarding/VoiceStep";
 import { PortfolioStep } from "@/components/onboarding/PortfolioStep";
+import { SarlaftStep } from "@/components/onboarding/SarlaftStep";
 import type { PortfolioRecommendation } from "@/hooks/useVoiceAgent";
 import { Loader2 } from "lucide-react";
+import Link from "next/link";
 import type { SarlaftPackage } from "@/lib/sarlaft/schema";
 import { SAGRILAFT_OTRAS_14_LABELS } from "@/lib/sarlaft/schema";
 
@@ -24,7 +26,8 @@ const STEPS = [
   { id: 3, label: "Ingesta", desc: "Documentación corporativa" },
   { id: 4, label: "KYC", desc: "Representante legal" },
   { id: 5, label: "Asesor", desc: "Perfil y objetivos" },
-  { id: 6, label: "Portafolio", desc: "Recomendación y envíos" },
+  { id: 6, label: "Portafolio", desc: "Recomendación de inversión" },
+  { id: 7, label: "SARLAFT", desc: "Formularios y envío regulatorio" },
 ];
 
 function buildDemoPackage(intake: IntakeData): SarlaftPackage {
@@ -119,7 +122,7 @@ export default function OnboardingPage() {
   const [preparingPortfolio, setPreparingPortfolio] = useState(false);
   const [prepProgress, setPrepProgress] = useState(0);
 
-  const next = () => setStep((s) => Math.min(s + 1, 6));
+  const next = () => setStep((s) => Math.min(s + 1, 7));
   const back = () => setStep((s) => Math.max(s - 1, 1));
 
   const startPortfolioPreparation = useCallback(() => {
@@ -147,7 +150,7 @@ export default function OnboardingPage() {
   }, [preparingPortfolio]);
 
   useEffect(() => {
-    if (step !== 6) return;
+    if (step < 6) return;
     setSarlaftPkg((prev) => prev ?? buildDemoPackage(intake));
   }, [step, intake]);
 
@@ -181,6 +184,14 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-white flex flex-col">
       <header className="sticky top-0 z-50 border-b border-gray-100 bg-white/95 backdrop-blur-xl">
         <div className="max-w-3xl mx-auto px-4 sm:px-8 py-4">
+          <div className="flex items-center justify-end mb-3">
+            <Link
+              href="/"
+              className="text-xs font-semibold text-gray-500 hover:text-[#1a1a1a] transition-colors"
+            >
+              Volver al home
+            </Link>
+          </div>
           {/* Desktop / tablet: stepper centrado */}
           <nav
             aria-label="Progreso del onboarding"
@@ -319,6 +330,25 @@ export default function OnboardingPage() {
             <PortfolioStep
               intake={intake}
               recommendation={recommendation}
+              onNext={next}
+              onBack={back}
+              onRestart={() => {
+                setStep(1);
+                setIntake({ nombre: "", empresa: "", sector: "" });
+                setRecommendation(null);
+                setSarlaftPkg(null);
+              }}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 py-24 text-gray-500">
+              <Loader2 className="h-8 w-8 animate-spin text-[#6abf1a]" aria-hidden />
+              <p className="text-sm">Preparando formularios…</p>
+            </div>
+          ))}
+
+        {step === 7 &&
+          (sarlaftPkg ? (
+            <SarlaftStep
               sarlaftPkg={sarlaftPkg}
               onSarlaftChange={setSarlaftPkg}
               onGeneratePdf={handleGeneratePdf}

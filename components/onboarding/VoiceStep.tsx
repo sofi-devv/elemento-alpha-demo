@@ -14,15 +14,6 @@ interface Props {
   onBack: () => void;
 }
 
-const QUESTIONS = [
-  "Ciclo actual de la empresa",
-  "Necesidad de liquidez inmediata",
-  "Horizonte esperado de liquidez",
-  "Experiencia de inversión",
-  "Expectativa de variación",
-  "Decisión ante desvalorización",
-];
-
 export function VoiceStep({ intake, onRecommendation, onNext, onBack }: Props) {
   const [receivedRec, setReceivedRec] = useState<PortfolioRecommendation | null>(null);
 
@@ -70,12 +61,12 @@ export function VoiceStep({ intake, onRecommendation, onNext, onBack }: Props) {
           Hola{intake.nombre.trim() ? `, ${intake.nombre.trim().split(/\s+/)[0]}` : ""}
         </h2>
         <p className="text-sm text-gray-500 mt-2 leading-relaxed max-w-xl">
-          El asesor de IA hará <span className="font-medium text-[#1a1a1a]">6 preguntas</span> sobre la
+          El asesor de IA hará <span className="font-medium text-[#1a1a1a]">7 preguntas</span> sobre la
           empresa para proponer un portafolio a{" "}
           <span className="font-medium text-[#1a1a1a]">
             {intake.empresa.trim() || "tu empresa"}
           </span>
-          . Son preguntas cerradas y puedes responder por número de opción. Puedes terminar la llamada cuando quieras.
+          . Son preguntas cerradas y puedes responder por número de opción, en formato conversacional. Puedes terminar la llamada cuando quieras.
         </p>
       </header>
 
@@ -108,20 +99,6 @@ export function VoiceStep({ intake, onRecommendation, onNext, onBack }: Props) {
         </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left max-w-xl mx-auto">
-          {QUESTIONS.map((q, i) => (
-            <li
-              key={q}
-              className="flex items-center gap-2 text-xs text-gray-500"
-            >
-              <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold bg-gray-100 text-gray-500 shrink-0">
-                {i + 1}
-              </span>
-              <span className="leading-tight">{q}</span>
-            </li>
-          ))}
-        </ul>
 
         <div className="flex justify-center gap-3 pt-2">
           {isConnecting ? (
