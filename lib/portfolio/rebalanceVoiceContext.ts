@@ -9,14 +9,14 @@ export function buildRebalanceVoiceContext(timeSeries: PortfolioTimeSeriesPoint[
   const head = timeSeries.length > 0 ? timeSeries[0] : null;
 
   const payload = {
-    escenario: "Comparación portafolio actual vs opción rebalanceada Portfolio 32",
+    escenario: "Comparación entre tu portafolio actual y el portafolio sugerido (rebalanceo)",
     metricas: {
       benchmark: {
-        etiqueta: "Portafolio actual (referencia)",
+        etiqueta: "Tu portafolio actual (referencia)",
         valores: PORTFOLIO_METRICS.benchmark,
       },
       portfolio32: {
-        etiqueta: "Portfolio 32 (opción de rebalanceo mostrada en pantalla)",
+        etiqueta: "Sugerido (opción de rebalanceo mostrada en pantalla)",
         valores: PORTFOLIO_METRICS.portfolio32,
       },
     },
@@ -27,7 +27,7 @@ export function buildRebalanceVoiceContext(timeSeries: PortfolioTimeSeriesPoint[
     })),
     serieHistorica: {
       descripcion:
-        "Serie diaria normalizada con base 100. «provided» = trayectoria tipo benchmark; «portfolio32» = Portfolio 32.",
+        "Serie diaria normalizada con base 100. «provided» = tu portafolio actual; «portfolio32» = portafolio sugerido.",
       primeraFecha: head?.date ?? null,
       ultimaFecha: last?.date ?? null,
       ultimoNivelBenchmark100: last?.provided ?? null,
