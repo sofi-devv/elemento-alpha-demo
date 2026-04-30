@@ -1,5 +1,5 @@
 /**
- * Paquete de vinculación Skandia — tipos alineados al JSON de formularios SARLAFT / FATCA / Vinculación PJ.
+ * Paquete de vinculación PJ — tipos alineados al JSON de formularios SARLAFT / FATCA / Vinculación PJ.
  */
 
 export type SiNoNA = "Sí" | "No" | "N/A";
@@ -143,7 +143,7 @@ export interface PepDetalle {
   tipo_parentesco: string;
 }
 
-/** Formulario 3: Solicitud de Vinculación PJ (Skandia) */
+/** Formulario 3: Solicitud de Vinculación PJ */
 export interface VinculacionForm {
   id_formulario: "3";
   tipo_empresa: TipoEmpresa | "";

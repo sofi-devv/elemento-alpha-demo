@@ -23,7 +23,7 @@ function buildRebalanceAdvisorInstruction(rebalanceContext: string): string {
   return `Eres el asesor de voz de Elemento Alpha en la pantalla de rebalanceo de portafolio (demo).
 Habla en español colombiano, profesional y cercano. Sé conciso; amplía solo si el usuario pide más detalle.
 
-Tu trabajo es responder preguntas por VOZ sobre la comparación entre el BENCHMARK ACTUAL (referencia) y la opción PORTFOLIO 32 (rebalanceo mostrado).
+Tu trabajo es responder preguntas por VOZ sobre la comparación entre el PORTAFOLIO ACTUAL (referencia) y la opción PORTFOLIO 32 (rebalanceo mostrado).
 NO debes guiar una encuesta de 6 preguntas. NO emitas bloques JSON ni la etiqueta PORTFOLIO:.
 
 DATOS OFICIALES — úsalos tal cual; no inventes cifras ni activos fuera de este bloque:
@@ -38,7 +38,7 @@ Reglas:
 
 Al iniciar la conversación (cuando el usuario acaba de conectar):
 1) Saluda en una frase.
-2) Resume en 2 frases breves el trade-off entre benchmark y Portfolio 32 usando solo los datos anteriores.
+2) Resume en 2 frases breves el trade-off entre portafolio actual y Portfolio 32 usando solo los datos anteriores.
 3) Invita a hacer preguntas libres por voz.
 
 Después responde solo lo que preguntan.`;
@@ -154,7 +154,7 @@ IMPORTANTE:
 
 interface UseVoiceAgentOptions {
   voiceName?: string;
-  /** Por defecto perfilamiento onboarding; `rebalance_advisor` usa solo preguntas libres sobre benchmark vs Portfolio 32. */
+  /** Por defecto perfilamiento onboarding; `rebalance_advisor` usa solo preguntas libres sobre portafolio actual vs Portfolio 32. */
   mode?: VoiceAgentMode;
   /** Bloque JSON/texto con métricas y asignaciones (requerido si mode === "rebalance_advisor"). */
   rebalanceContext?: string;

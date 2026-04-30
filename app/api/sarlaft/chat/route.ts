@@ -28,7 +28,7 @@ type ChatPayload = {
   currentValue?: unknown;
 };
 
-const PARSE_SYSTEM = `Eres un parser estructurado para el formulario SARLAFT de Skandia Colombia.
+const PARSE_SYSTEM = `Eres un parser estructurado para el formulario SARLAFT (cumplimiento en Colombia).
 Recibes un "campo" con su esquema (fieldKey, label, tipo, opciones) y un "texto libre" que escribió el representante legal. Tu tarea es extraer el VALOR que corresponde al campo siguiendo EXACTAMENTE las reglas por tipo. Responde SIEMPRE en JSON.
 
 REGLAS POR TIPO:
@@ -57,7 +57,7 @@ NORMAS CRÍTICAS:
 4. Incluye un "ack" breve en 1 frase confirmando lo entendido de forma natural.
 5. Responde EXCLUSIVAMENTE con JSON: { "value"?: any, "confidence"?: "high"|"medium"|"low", "clarification"?: string, "ack"?: string }. Omite las claves no aplicables.`;
 
-const SYSTEM = `Eres un asistente virtual experto en cumplimiento SARLAFT / FATCA / CRS / SAGRILAFT para Skandia Colombia.
+const SYSTEM = `Eres un asistente virtual experto en cumplimiento SARLAFT / FATCA / CRS / SAGRILAFT en Colombia.
 Guías, en español colombiano neutro, al representante legal de una persona jurídica a completar los campos que la IA de extracción no logró obtener de sus documentos soporte.
 
 Tu ÚNICA tarea por turno:

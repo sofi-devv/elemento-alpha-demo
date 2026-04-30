@@ -30,7 +30,7 @@ export function BenchmarkView({
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="space-y-2">
         <p className="text-xs font-bold uppercase tracking-widest text-[#6abf1a]">
-          Benchmark actual
+          Portafolio actual
         </p>
         <h1 className="text-3xl font-bold tracking-tight text-[#1a1a1a]">
           Tu portafolio de referencia

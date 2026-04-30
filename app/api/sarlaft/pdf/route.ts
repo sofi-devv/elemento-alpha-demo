@@ -78,14 +78,14 @@ export async function POST(request: NextRequest) {
     const zip = new JSZip();
     zip.file("01_SAGRILAFT_SARLAFT.pdf", b1, { binary: true });
     zip.file("02_FATCA_CRS.pdf", b2, { binary: true });
-    zip.file("03_Vinculacion_PJ_Skandia.pdf", b3, { binary: true });
+    zip.file("03_Vinculacion_PJ.pdf", b3, { binary: true });
     const zipBuffer = await zip.generateAsync({ type: "arraybuffer" });
 
     return new NextResponse(zipBuffer, {
       status: 200,
       headers: {
         "Content-Type": "application/zip",
-        "Content-Disposition": 'attachment; filename="paquete_vinculacion_skandia.zip"',
+        "Content-Disposition": 'attachment; filename="paquete_vinculacion.zip"',
       },
     });
   } catch (e) {

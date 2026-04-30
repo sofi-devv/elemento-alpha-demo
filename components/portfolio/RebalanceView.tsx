@@ -352,7 +352,7 @@ function MetricHoverComparison({
         <p className="text-[10px] font-medium uppercase tracking-wide text-gray-400">Antes vs rebalanceo</p>
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <span className="w-[6.5rem] shrink-0 text-[10px] leading-tight text-gray-500">Benchmark actual</span>
+            <span className="w-[6.5rem] shrink-0 text-[10px] leading-tight text-gray-500">Portafolio actual</span>
             <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
               <div
                 className="h-full origin-left scale-x-0 rounded-full bg-gray-400 transition-transform duration-500 ease-out group-hover:scale-x-100"

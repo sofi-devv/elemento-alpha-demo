@@ -9,10 +9,10 @@ export function buildRebalanceVoiceContext(timeSeries: PortfolioTimeSeriesPoint[
   const head = timeSeries.length > 0 ? timeSeries[0] : null;
 
   const payload = {
-    escenario: "Comparación benchmark actual vs opción rebalanceada Portfolio 32",
+    escenario: "Comparación portafolio actual vs opción rebalanceada Portfolio 32",
     metricas: {
       benchmark: {
-        etiqueta: "Benchmark actual (referencia)",
+        etiqueta: "Portafolio actual (referencia)",
         valores: PORTFOLIO_METRICS.benchmark,
       },
       portfolio32: {

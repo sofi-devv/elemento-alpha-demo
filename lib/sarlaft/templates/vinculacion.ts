@@ -45,7 +45,7 @@ export function buildVinculacionHtml(f: VinculacionForm): string {
 <title>Vinculación PJ</title>
 </head>
 <body>
-  <h1>Solicitud de Vinculación Persona Jurídica (Skandia)</h1>
+  <h1>Solicitud de Vinculación Persona Jurídica</h1>
   <p class="muted">Apertura comercial, perfilamiento financiero y firmas autorizadas</p>
   <h2>1. Información básica y financiera (COP)</h2>
   <table>
