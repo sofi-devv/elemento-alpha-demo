@@ -92,10 +92,10 @@ export function KycValidationStep({ intake, onConfirmIdentity, onBack }: Props) 
   const [identityFile, setIdentityFile] = useState<File | null>(null);
   const [extractedIdentity, setExtractedIdentity] = useState<ExtractedIdentity | null>(null);
   const identityInputRef = useRef<HTMLInputElement>(null);
-  const timersRef = useRef<ReturnType<typeof setInterval>[]>([]);
+  const timersRef = useRef<number[]>([]);
 
   const clearTimers = useCallback(() => {
-    timersRef.current.forEach((id) => clearInterval(id));
+    timersRef.current.forEach((id) => window.clearInterval(id));
     timersRef.current = [];
   }, []);
 

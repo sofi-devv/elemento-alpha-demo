@@ -10,16 +10,27 @@ import {
   FileText,
   Upload,
   X,
-  ChevronRight,
   ArrowLeft,
   CheckCircle2,
   Plus,
+  CreditCard,
+  Loader2,
+  ScanLine,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { IntakeData } from "@/app/onboarding/page";
+import { createEmptyPackage, type MissingFieldRef, type SarlaftPackage } from "@/lib/sarlaft/schema";
+import { computeMissingFields } from "@/lib/sarlaft/missingFields";
+import type { OcrReportItem } from "@/lib/sarlaft/ocrTypes";
 
 type DocStatus = "pending" | "uploaded";
+
+type Phase = "idle" | "analyzing";
+
+/** Claves reconocidas por `/api/sarlaft/extract` */
+const SARLAFT_FORM_KEYS = new Set(["camara", "rut", "cedula", "accionaria", "estados", "renta"]);
 
 interface Doc {
   id: string;
@@ -52,6 +63,15 @@ const INITIAL_DOCS: Doc[] = [
     required: true,
   },
   {
+    id: "cedula",
+    icon: CreditCard,
+    title: "Cédula del representante legal",
+    desc: "Opcional aquí si ya la tienes; también podrás cargarla en el paso KYC.",
+    req: "PDF o imagen",
+    status: "pending",
+    required: false,
+  },
+  {
     id: "estados",
     icon: BarChart2,
     title: "Estados financieros",
@@ -82,8 +102,56 @@ const INITIAL_DOCS: Doc[] = [
 
 interface Props {
   intake: IntakeData;
-  onNext: () => void;
+  /** Después del análisis IA (o al omitir), devuelve paquete y metadatos al padre. */
+  onContinue: (payload: {
+    package: SarlaftPackage;
+    missing: MissingFieldRef[];
+    ocrReport: OcrReportItem[] | null;
+  }) => void;
   onBack?: () => void;
+}
+
+interface AnalysisProgress {
+  currentDoc: string;
+  currentIndex: number;
+  total: number;
+}
+
+function AnalyzingScreen({ progress }: { progress: AnalysisProgress }) {
+  const pct = progress.total > 0 ? Math.round((progress.currentIndex / progress.total) * 100) : 0;
+
+  return (
+    <div className="rounded-lg border border-gray-100 bg-white p-8 shadow-sm animate-in fade-in">
+      <div className="text-center mb-6">
+        <div className="w-16 h-16 rounded-full bg-[#F0FEE6] flex items-center justify-center mx-auto mb-4 ring-4 ring-[#BBE795]/20">
+          <ScanLine className="w-8 h-8 text-[#6abf1a] animate-pulse" />
+        </div>
+        <h2 className="text-xl font-bold text-[#1a1a1a] tracking-tight">Analizando documentos SARLAFT</h2>
+        <p className="text-sm text-gray-500 mt-1">Extraemos datos para tus formularios regulatorios</p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-500">Progreso</span>
+          <span className="font-semibold text-[#1a1a1a]">
+            {progress.currentIndex} de {progress.total}
+          </span>
+        </div>
+        <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-[#BBE795] to-[#7dd83a] rounded-full transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 border border-gray-100">
+          <Loader2 className="w-4 h-4 text-[#6abf1a] animate-spin shrink-0" />
+          <p className="text-sm text-gray-600 truncate">
+            Procesando: <span className="font-medium">{progress.currentDoc}</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function DocCard({
@@ -121,7 +189,7 @@ function DocCard({
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,.png,.jpg,.jpeg"
+        accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
@@ -175,7 +243,15 @@ function DocCard({
   );
 }
 
-export function DocumentIngestStep({ intake, onNext, onBack }: Props) {
+export function DocumentIngestStep({ intake, onContinue, onBack }: Props) {
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress>({
+    currentDoc: "",
+    currentIndex: 0,
+    total: 0,
+  });
+
   const [docs, setDocs] = useState<Doc[]>(INITIAL_DOCS);
   const [newDocName, setNewDocName] = useState("");
 
@@ -218,11 +294,116 @@ export function DocumentIngestStep({ intake, onNext, onBack }: Props) {
 
   const empresa = intake.empresa.trim() || "tu empresa";
 
+  const uploadedForExtract = docs.filter(
+    (d) => d.status === "uploaded" && d.file && SARLAFT_FORM_KEYS.has(d.id)
+  );
+
+  const runExtract = useCallback(async () => {
+    if (uploadedForExtract.length === 0 || !canContinue) return;
+    setPhase("analyzing");
+    setExtractError(null);
+
+    const formData = new FormData();
+    for (const doc of uploadedForExtract) {
+      if (doc.file) formData.append(doc.id, doc.file);
+    }
+
+    setAnalysisProgress({
+      currentDoc: "Preparando…",
+      currentIndex: 0,
+      total: uploadedForExtract.length,
+    });
+
+    try {
+      const res = await fetch("/api/sarlaft/extract", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const errData = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errData.error || `Error ${res.status}`);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No se pudo leer la respuesta");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let msg: {
+            type: string;
+            fileName?: string;
+            index?: number;
+            total?: number;
+            package?: SarlaftPackage;
+            missing?: MissingFieldRef[];
+            ocrReport?: OcrReportItem[] | null;
+            message?: string;
+          };
+          try {
+            msg = JSON.parse(line) as typeof msg;
+          } catch {
+            console.warn("Línea NDJSON inválida:", line.slice(0, 80));
+            continue;
+          }
+          if (msg.type === "doc_start") {
+            setAnalysisProgress({
+              currentDoc: msg.fileName || "Documento",
+              currentIndex: msg.index ?? 0,
+              total: msg.total ?? uploadedForExtract.length,
+            });
+          } else if (msg.type === "complete" && msg.package) {
+            onContinue({
+              package: msg.package,
+              missing: msg.missing ?? [],
+              ocrReport: msg.ocrReport ?? null,
+            });
+            setPhase("idle");
+            return;
+          } else if (msg.type === "error") {
+            throw new Error(msg.message || "Error en extracción");
+          }
+        }
+      }
+      throw new Error("La extracción terminó sin resultado");
+    } catch (err) {
+      console.error(err);
+      setExtractError(err instanceof Error ? err.message : "Error desconocido");
+      setPhase("idle");
+    }
+  }, [uploadedForExtract, canContinue, onContinue]);
+
+  const continueWithoutAnalysis = useCallback(() => {
+    const empty = createEmptyPackage();
+    onContinue({
+      package: empty,
+      missing: computeMissingFields(empty),
+      ocrReport: null,
+    });
+  }, [onContinue]);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
       <div className="flex items-center justify-between">
         {onBack ? (
-          <Button variant="ghost" onClick={onBack} className="h-9 px-0 text-gray-500">
+          <Button
+            variant="ghost"
+            onClick={onBack}
+            className="h-9 px-0 text-gray-500"
+            disabled={phase === "analyzing"}
+          >
             <ArrowLeft className="h-4 w-4 mr-1.5" /> Volver
           </Button>
         ) : (
@@ -231,15 +412,23 @@ export function DocumentIngestStep({ intake, onNext, onBack }: Props) {
         <Button
           id="ingest-next-top"
           type="button"
-          onClick={onNext}
-          disabled={!canContinue}
+          onClick={runExtract}
+          disabled={!canContinue || phase === "analyzing" || uploadedForExtract.length === 0}
           className={`h-9 px-5 rounded-lg font-semibold gap-1.5 transition-all duration-200 ${
-            canContinue
+            canContinue && uploadedForExtract.length > 0 && phase !== "analyzing"
               ? "bg-[#4a7c59] text-white hover:bg-[#3f6b4c] shadow-sm hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
               : "bg-gray-100 text-gray-400 cursor-not-allowed"
           }`}
         >
-          Continuar <ChevronRight className="h-4 w-4" />
+          {phase === "analyzing" ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Analizando…
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-4 w-4" /> Continuar con IA
+            </>
+          )}
         </Button>
       </div>
 
@@ -251,11 +440,23 @@ export function DocumentIngestStep({ intake, onNext, onBack }: Props) {
         <p className="text-sm text-gray-500 mt-2 leading-relaxed max-w-xl">
           Sube los documentos de <span className="font-medium text-[#1a1a1a]">{empresa}</span>
           {intake.sector.trim() ? <> · sector <span className="font-medium text-[#1a1a1a]">{intake.sector}</span></> : null}.
-          Los marcados como requeridos son necesarios para continuar; los opcionales mejoran la calidad
-          de la recomendación.
+          Al continuar analizamos con IA los archivos estándar (RUT, cámara, etc.) para adelantar tus
+          formularios SARLAFT. Los marcados como requeridos son obligatorios para avanzar.
         </p>
       </header>
 
+      {extractError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 space-y-2">
+          <p>{extractError}</p>
+          <Button type="button" variant="outline" size="sm" className="border-red-300" onClick={continueWithoutAnalysis}>
+            Continuar sin análisis IA
+          </Button>
+        </div>
+      )}
+
+      {phase === "analyzing" && <AnalyzingScreen progress={analysisProgress} />}
+
+      {phase === "idle" && (
       <div className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-4 text-sm">
           <span className="font-medium text-[#1a1a1a]">
@@ -286,7 +487,9 @@ export function DocumentIngestStep({ intake, onNext, onBack }: Props) {
           )}
         </p>
       </div>
+      )}
 
+      {phase === "idle" && (
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <p className="text-xs font-bold text-red-500 uppercase tracking-wider">
@@ -300,7 +503,9 @@ export function DocumentIngestStep({ intake, onNext, onBack }: Props) {
           ))}
         </div>
       </section>
+      )}
 
+      {phase === "idle" && (
       <section className="space-y-3">
         <div className="flex items-baseline justify-between">
           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Opcionales</p>
@@ -337,6 +542,15 @@ export function DocumentIngestStep({ intake, onNext, onBack }: Props) {
           ))}
         </div>
       </section>
+      )}
+
+      {phase === "idle" && (
+        <p className="text-[11px] text-gray-400 leading-relaxed">
+          Tip: solo los documentos con tipo reconocido (RUT, cámara, cédula RL, accionariado, estados,
+          renta) se envían al motor de extracción. Los adjuntos personalizados sirven como respaldo pero no
+          se analizan automáticamente en este paso.
+        </p>
+      )}
     </div>
   );
 }

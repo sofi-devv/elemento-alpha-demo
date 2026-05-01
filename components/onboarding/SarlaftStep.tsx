@@ -1,10 +1,14 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import { ArrowLeft, CheckCircle2, FileStack, House, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { FormsPreview } from "@/components/sarlaft/FormsPreview";
-import type { SarlaftPackage } from "@/lib/sarlaft/schema";
+import { FieldByFieldForm } from "@/components/sarlaft/FieldByFieldForm";
+import type { MissingFieldRef, SarlaftPackage } from "@/lib/sarlaft/schema";
+import { computeMissingFields } from "@/lib/sarlaft/missingFields";
+import type { OcrReportItem } from "@/lib/sarlaft/ocrTypes";
 
 const DOCUMENT_ITEMS = [
   "Paquete SARLAFT / FATCA / CRS / Vinculación (PDF editables y ZIP)",
@@ -14,7 +18,10 @@ const DOCUMENT_ITEMS = [
 
 interface Props {
   sarlaftPkg: SarlaftPackage;
+  missingFields: MissingFieldRef[];
+  ocrReport: OcrReportItem[] | null;
   onSarlaftChange: (p: SarlaftPackage) => void;
+  onMissingResolved: (missing: MissingFieldRef[]) => void;
   onGeneratePdf: () => Promise<void>;
   generating: boolean;
   onBack: () => void;
@@ -23,12 +30,35 @@ interface Props {
 
 export function SarlaftStep({
   sarlaftPkg,
+  missingFields,
+  ocrReport,
   onSarlaftChange,
+  onMissingResolved,
   onGeneratePdf,
   generating,
   onBack,
   onRestart,
 }: Props) {
+  const [phase, setPhase] = useState<"missing" | "preview">(() =>
+    missingFields.length > 0 ? "missing" : "preview"
+  );
+
+  const handleWizardComplete = useCallback(
+    (updated: SarlaftPackage) => {
+      onSarlaftChange(updated);
+      onMissingResolved(computeMissingFields(updated));
+      setPhase("preview");
+    },
+    [onSarlaftChange, onMissingResolved]
+  );
+
+  const handlePackageUpdateFromWizard = useCallback(
+    (p: SarlaftPackage) => {
+      onSarlaftChange(p);
+    },
+    [onSarlaftChange]
+  );
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
       <div className="flex items-center justify-between">
@@ -46,7 +76,9 @@ export function SarlaftStep({
         <p className="text-xs font-semibold text-[#6abf1a] uppercase tracking-wider mb-1">Paso 7 · SARLAFT</p>
         <h2 className="text-2xl font-bold text-[#1a1a1a] tracking-tight">Documentación regulatoria</h2>
         <p className="text-sm text-gray-500 mt-2 leading-relaxed max-w-xl">
-          Revisa, ajusta y exporta los formularios para cerrar el proceso de vinculación.
+          {phase === "missing"
+            ? "Completa los campos que no se pudieron inferir de tus documentos ni de la entrevista."
+            : "Revisa, ajusta y exporta los formularios para cerrar el proceso de vinculación."}
         </p>
       </header>
 
@@ -75,18 +107,34 @@ export function SarlaftStep({
         </ul>
       </div>
 
-      <div>
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">
-          Formularios SARLAFT (editables)
-        </p>
-        <FormsPreview
-          value={sarlaftPkg}
-          onChange={onSarlaftChange}
-          onGeneratePdf={onGeneratePdf}
-          generating={generating}
-          ocrReport={null}
-        />
-      </div>
+      {phase === "missing" && (
+        <div className="space-y-4">
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+            Información pendiente ({missingFields.length})
+          </p>
+          <FieldByFieldForm
+            package={sarlaftPkg}
+            missing={missingFields}
+            onComplete={handleWizardComplete}
+            onUpdate={handlePackageUpdateFromWizard}
+          />
+        </div>
+      )}
+
+      {phase === "preview" && (
+        <div>
+          <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3">
+            Formularios SARLAFT (editables)
+          </p>
+          <FormsPreview
+            value={sarlaftPkg}
+            onChange={onSarlaftChange}
+            onGeneratePdf={onGeneratePdf}
+            generating={generating}
+            ocrReport={ocrReport}
+          />
+        </div>
+      )}
 
       <Button
         type="button"

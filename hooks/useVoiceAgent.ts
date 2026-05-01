@@ -15,6 +15,17 @@ export interface PortfolioRecommendation {
   razon: string;
   monto?: string;
   productosRecomendados?: string[];
+  /**
+   * Índices de opción elegida en cada pregunta cerrada (1-based), para SARLAFT y auditoría.
+   * Deben coincidir con las opciones del guion de voz al cerrar la entrevista.
+   */
+  resp_proposito?: number;
+  resp_ciclo?: number;
+  resp_liquidez?: number;
+  resp_horizonte?: number;
+  resp_experiencia?: number;
+  resp_expectativa_vol?: number;
+  resp_reaccion?: number;
 }
 
 export type VoiceAgentMode = "onboarding" | "rebalance_advisor";
@@ -25,6 +36,46 @@ function safeJsonParse<T>(raw: string): T | null {
   } catch {
     return null;
   }
+}
+
+/** Extrae el objeto JSON tras PORTFOLIO_JSON: / PORTFOLIO: respetando llaves y strings. */
+function extractPortfolioJsonObject(buffer: string): string | null {
+  let baseIdx = buffer.indexOf("PORTFOLIO_JSON:");
+  let scanFrom = baseIdx >= 0 ? baseIdx + "PORTFOLIO_JSON:".length : -1;
+  if (scanFrom < 0) {
+    baseIdx = buffer.indexOf("PORTFOLIO:");
+    if (baseIdx < 0) return null;
+    scanFrom = baseIdx + "PORTFOLIO:".length;
+  }
+  const open = buffer.indexOf("{", scanFrom);
+  if (open === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = open; i < buffer.length; i++) {
+    const ch = buffer[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\" && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return buffer.slice(open, i + 1);
+    }
+  }
+  return null;
 }
 
 function buildRebalanceAdvisorInstruction(rebalanceContext: string): string {
@@ -164,8 +215,17 @@ ROUTING:
 
 AL FINAL (después de la última respuesta o si el usuario decide terminar):
 - Da una conclusión breve en voz (máx 2 frases).
-- En una línea aparte, agrega SOLO este metadato en texto plano:
-PORTFOLIO_JSON:{"portfolio":"conservador|moderado|agresivo","nombre":"FIC líquido|FIC Horizontes|FIC ESTABLE","perfil":"Conservador|Moderado|Agresivo","plazo":"corto plazo|mediano plazo|largo plazo","razon":"razón concreta en 1 frase","monto":"monto mencionado o no especificado","productosRecomendados":["producto 1","producto 2","producto 3"]}
+- En una línea aparte, agrega SOLO este metadato en texto plano (un único objeto JSON válido; incluye SIEMPRE las claves resp_* con el número entero de la opción elegida por el cliente en cada pregunta, 1-based):
+PORTFOLIO_JSON:{"portfolio":"conservador|moderado|agresivo","nombre":"FIC líquido|FIC Horizontes|FIC ESTABLE","perfil":"Conservador|Moderado|Agresivo","plazo":"corto plazo|mediano plazo|largo plazo","razon":"razón concreta en 1 frase","monto":"monto mencionado o no especificado","productosRecomendados":["producto 1","producto 2","producto 3"],"resp_proposito":1,"resp_ciclo":2,"resp_liquidez":3,"resp_horizonte":1,"resp_experiencia":2,"resp_expectativa_vol":2,"resp_reaccion":3}
+Donde resp_* DEBEN reflejar las respuestas reales del cliente en este mismo orden del guion:
+- resp_proposito: pregunta propósito de la inversión (opciones 1–3).
+- resp_ciclo: pregunta ciclo de la empresa (1–3).
+- resp_liquidez: pregunta disponer dinero de forma inmediata (1–3).
+- resp_horizonte: pregunta periodo de liquidez esperado (1–3).
+- resp_experiencia: pregunta nivel de experiencia en inversiones (1–4).
+- resp_expectativa_vol: pregunta expectativa ante volatilidad (1–3).
+- resp_reaccion: pregunta reacción ante desvalorización (1–4).
+Si el usuario cortó antes de terminar, estima resp_* coherente con lo dicho hasta ese momento y dilo en razon.
 - No expliques ni repitas el JSON.
 - Nunca cierres la llamada abruptamente; despídete con una frase breve y cordial.
 
@@ -416,12 +476,10 @@ export function useVoiceAgent({
               if (part.text) {
                 transcriptBufferRef.current += part.text;
                 if (modeRef.current !== "rebalance_advisor") {
-                  const markerMatch = transcriptBufferRef.current.match(
-                    /PORTFOLIO(?:_JSON)?:\s*(\{[^\n]*\})/
-                  );
-                  if (markerMatch) {
-                    const rec = safeJsonParse<PortfolioRecommendation>(markerMatch[1]);
-                    if (rec) {
+                  const jsonSlice = extractPortfolioJsonObject(transcriptBufferRef.current);
+                  if (jsonSlice) {
+                    const rec = safeJsonParse<PortfolioRecommendation>(jsonSlice);
+                    if (rec?.portfolio) {
                       onRecommendationRef.current?.(rec);
                       transcriptBufferRef.current = "";
                     }

@@ -11,8 +11,14 @@ import { SarlaftStep } from "@/components/onboarding/SarlaftStep";
 import type { PortfolioRecommendation } from "@/hooks/useVoiceAgent";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
-import type { SarlaftPackage } from "@/lib/sarlaft/schema";
-import { SAGRILAFT_OTRAS_14_LABELS } from "@/lib/sarlaft/schema";
+import type { MissingFieldRef, SarlaftPackage } from "@/lib/sarlaft/schema";
+import { createEmptyPackage } from "@/lib/sarlaft/schema";
+import { computeMissingFields } from "@/lib/sarlaft/missingFields";
+import type { OcrReportItem } from "@/lib/sarlaft/ocrTypes";
+import {
+  applyIntakeToSarlaft,
+  applyInterviewToSarlaft,
+} from "@/lib/sarlaft/onboardingSarlaftMerge";
 
 export type IntakeData = {
   nombre: string;
@@ -30,94 +36,13 @@ const STEPS = [
   { id: 7, label: "SARLAFT", desc: "Formularios y envío regulatorio" },
 ];
 
-function buildDemoPackage(intake: IntakeData): SarlaftPackage {
-  const empresa = intake.empresa || "Acropolis Labs S.A.S.";
-  const nombre = intake.nombre || "Paula Torres";
-  return {
-    formulario_1: {
-      id_formulario: "1",
-      nombre_completo_razon_social: empresa,
-      tipo_y_numero_identificacion: "NIT 901.234.567-8",
-      num_oficinas_pais: 1,
-      num_oficinas_exterior: 0,
-      ciudades_paises_operacion: "Bogotá, Colombia",
-      politicas: {
-        programa_laft_documentado: {
-          pregunta: "¿Su entidad tiene un programa/sistema LA/FT documentado y actualizado?",
-          respuesta: "Sí",
-          detalle_programa: { organo_aprobacion: "Junta Directiva", fecha_aprobacion: "2024-03-15" },
-        },
-        regulacion_gubernamental_laft: {
-          pregunta: "¿Su entidad está sujeta a regulación gubernamental LA/FT?",
-          respuesta: "Sí",
-          detalle_regulacion: { normatividad: "Ley 526 de 1999 / Decreto 1674 de 2021" },
-        },
-        oficial_cumplimiento: {
-          pregunta: "¿Tiene Oficial de Cumplimiento designado?",
-          respuesta: "Sí",
-          detalle_oficial: {
-            nombre: "Carolina Gómez Ríos",
-            identificacion: "52.845.123",
-            cargo: "Oficial de Cumplimiento",
-            email: "c.gomez@empresa.co",
-            telefono: "3001234567",
-          },
-        },
-        operaciones_efectivo: { pregunta: "¿Realiza operaciones en efectivo?", respuesta: "No" },
-        activos_virtuales: { pregunta: "¿Realiza transacciones o posee activos virtuales?", respuesta: "No" },
-        sancionada_investigada: {
-          pregunta: "¿La entidad ha sido sancionada o investigada por procesos de lavado de activos?",
-          respuesta: "No",
-        },
-        otras_14_preguntas: SAGRILAFT_OTRAS_14_LABELS.map((etiqueta) => ({ etiqueta, respuesta: "No" as const })),
-      },
-    },
-    formulario_2: {
-      id_formulario: "2",
-      razon_social: empresa,
-      identificacion_tributaria: "901.234.567-8",
-      pais_constitucion_fiscal: "Colombia",
-      actividad_principal: "d) Negocios de instrumentos de inversión (Fondos)",
-      ingresos_activos_pasivos_50: "No",
-      clasificacion_fatca_crs: "Entidad participante",
-      ubo: {
-        datos_personales: `${nombre} — Representante Legal`,
-        paises_tin: [{ pais: "Colombia", tin: "1.020.456.789" }],
-        tipo_control: "Control por propiedad",
-      },
-    },
-    formulario_3: {
-      id_formulario: "3",
-      tipo_empresa: "S.A.S.",
-      cifras_financieras: {
-        ingresos: 850000000,
-        egresos: 620000000,
-        total_activos: 1200000000,
-        total_pasivos: 350000000,
-        total_patrimonio: 850000000,
-      },
-      administra_recursos_publicos: "No",
-      grupo_contable_niif: "Grupo 2 (Pymes)",
-      ciclo_empresa: "Joven/Crecimiento",
-      liquidez: "Algo relevante",
-      experiencia_inversion: "Fondos de Inversión",
-      tolerancia_riesgo: "Esperar/Invertir más aprovechando precios bajos",
-      representantes_ordenates: `${nombre} — CC 1.020.456.789`,
-      es_pep: "No",
-      accionistas: [
-        { nombre, id: "1.020.456.789", porcentaje: 60, cotiza_en_bolsa: "No" },
-        { nombre: "Santiago Rueda", id: "1.019.234.567", porcentaje: 40, cotiza_en_bolsa: "No" },
-      ],
-      calidad_beneficiario_final: ["Por Titularidad (Capital / Derechos de voto)", "Por Control (Representante legal / Mayor autoridad)"],
-    },
-  };
-}
-
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [intake, setIntake] = useState<IntakeData>({ nombre: "", empresa: "", sector: "" });
   const [recommendation, setRecommendation] = useState<PortfolioRecommendation | null>(null);
   const [sarlaftPkg, setSarlaftPkg] = useState<SarlaftPackage | null>(null);
+  const [sarlaftMissingFields, setSarlaftMissingFields] = useState<MissingFieldRef[]>([]);
+  const [sarlaftOcrReport, setSarlaftOcrReport] = useState<OcrReportItem[] | null>(null);
   const [generating, setGenerating] = useState(false);
   const [preparingPortfolio, setPreparingPortfolio] = useState(false);
   const [prepProgress, setPrepProgress] = useState(0);
@@ -125,10 +50,27 @@ export default function OnboardingPage() {
   const next = () => setStep((s) => Math.min(s + 1, 7));
   const back = () => setStep((s) => Math.max(s - 1, 1));
 
+  const handleDocumentIngestContinue = useCallback(
+    (payload: { package: SarlaftPackage; missing: MissingFieldRef[]; ocrReport: OcrReportItem[] | null }) => {
+      const merged = applyIntakeToSarlaft(payload.package, intake);
+      setSarlaftPkg(merged);
+      setSarlaftMissingFields(computeMissingFields(merged));
+      setSarlaftOcrReport(payload.ocrReport);
+      next();
+    },
+    [intake]
+  );
+
   const startPortfolioPreparation = useCallback(() => {
+    setSarlaftPkg((prev) => {
+      const base = prev ?? createEmptyPackage();
+      const merged = recommendation ? applyInterviewToSarlaft(base, recommendation) : base;
+      queueMicrotask(() => setSarlaftMissingFields(computeMissingFields(merged)));
+      return merged;
+    });
     setPreparingPortfolio(true);
     setPrepProgress(0);
-  }, []);
+  }, [recommendation]);
 
   useEffect(() => {
     if (!preparingPortfolio) return;
@@ -148,11 +90,6 @@ export default function OnboardingPage() {
 
     return () => window.clearInterval(tick);
   }, [preparingPortfolio]);
-
-  useEffect(() => {
-    if (step < 6) return;
-    setSarlaftPkg((prev) => prev ?? buildDemoPackage(intake));
-  }, [step, intake]);
 
   const handleGeneratePdf = useCallback(async () => {
     if (!sarlaftPkg) return;
@@ -266,13 +203,24 @@ export default function OnboardingPage() {
           />
         )}
 
-        {step === 3 && <DocumentIngestStep intake={intake} onNext={next} onBack={back} />}
+        {step === 3 && (
+          <DocumentIngestStep intake={intake} onContinue={handleDocumentIngestContinue} onBack={back} />
+        )}
 
         {step === 4 && (
           <KycValidationStep
             intake={intake}
             onConfirmIdentity={(nombre) => {
-              setIntake((i) => ({ ...i, nombre: nombre.trim() || i.nombre }));
+              setIntake((i) => {
+                const nextIntake = { ...i, nombre: nombre.trim() || i.nombre };
+                setSarlaftPkg((p) => {
+                  if (!p) return p;
+                  const merged = applyIntakeToSarlaft(p, nextIntake);
+                  queueMicrotask(() => setSarlaftMissingFields(computeMissingFields(merged)));
+                  return merged;
+                });
+                return nextIntake;
+              });
               next();
             }}
             onBack={back}
@@ -337,6 +285,8 @@ export default function OnboardingPage() {
                 setIntake({ nombre: "", empresa: "", sector: "" });
                 setRecommendation(null);
                 setSarlaftPkg(null);
+                setSarlaftMissingFields([]);
+                setSarlaftOcrReport(null);
               }}
             />
           ) : (
@@ -350,7 +300,10 @@ export default function OnboardingPage() {
           (sarlaftPkg ? (
             <SarlaftStep
               sarlaftPkg={sarlaftPkg}
+              missingFields={sarlaftMissingFields}
+              ocrReport={sarlaftOcrReport}
               onSarlaftChange={setSarlaftPkg}
+              onMissingResolved={(missing) => setSarlaftMissingFields(missing)}
               onGeneratePdf={handleGeneratePdf}
               generating={generating}
               onBack={back}
@@ -359,6 +312,8 @@ export default function OnboardingPage() {
                 setIntake({ nombre: "", empresa: "", sector: "" });
                 setRecommendation(null);
                 setSarlaftPkg(null);
+                setSarlaftMissingFields([]);
+                setSarlaftOcrReport(null);
               }}
             />
           ) : (
